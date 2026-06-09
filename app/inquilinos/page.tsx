@@ -93,26 +93,26 @@ export default function InquilinosPage() {
               <div>
                 <label className="text-sm font-medium text-gray-700">Nome completo</label>
                 <input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                  placeholder="Ex: João da Silva"
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  placeholder="Ex: João da Silva" 
+                  className="mt-1 w-full placeholder-gray-400 text-gray-700 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">CPF</label>
                 <input type="text" value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })}
                   placeholder="Ex: 123.456.789-00"
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="mt-1 w-full text-gray-700 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">E-mail</label>
                 <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
                   placeholder="Ex: joao@email.com"
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="mt-1 w-full placeholder-gray-400 text-gray-700 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Telefone</label>
                 <input type="text" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
                   placeholder="Ex: (19) 99999-9999"
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  className="mt-1 w-full placeholder-gray-400 text-gray-700 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
             </div>
             <div className="flex gap-3 mt-5">
