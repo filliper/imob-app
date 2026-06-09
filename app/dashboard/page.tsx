@@ -62,26 +62,13 @@ export default function Dashboard() {
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
-          <a href="/dashboard" className="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium">
-            <span>🏠</span> Dashboard
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm">
-            <span>📄</span> Contratos
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm">
-            <span>🏢</span> Imóveis
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm">
-            <span>👤</span> Inquilinos
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm">
-            <span>📊</span> Reajuste
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm">
-            <span>🗓️</span> Vistorias
-          </a>
+          <a href="/dashboard"  className="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium"><span>🏠</span> Dashboard</a>
+          <a href="/contratos"  className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>📄</span> Contratos</a>
+          <a href="/imoveis"    className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>🏢</span> Imóveis</a>
+          <a href="/inquilinos" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>👤</span> Inquilinos</a>
+          <a href="/reajuste"   className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>📊</span> Reajuste</a>
+          <a href="/vistorias"  className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>🗓️</span> Vistorias</a>
         </nav>
-
         <div className="p-4 border-t border-gray-200">
           <p className="text-xs text-gray-500 truncate mb-2">{userEmail}</p>
           <button

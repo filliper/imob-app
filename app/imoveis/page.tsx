@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import Sidebar from '@/app/components/Sidebar'
 
 type Property = {
   id: string
@@ -81,20 +82,7 @@ export default function ImoveisPage() {
     <div className="min-h-screen bg-gray-50 flex">
 
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-gray-900">ImobApp</h1>
-          <p className="text-xs text-gray-500 mt-1">Gestão imobiliária</p>
-        </div>
-        <nav className="flex-1 p-4 space-y-1">
-          <a href="/dashboard"   className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>🏠</span> Dashboard</a>
-          <a href="#"            className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>📄</span> Contratos</a>
-          <a href="/imoveis"     className="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium"><span>🏢</span> Imóveis</a>
-          <a href="#"            className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>👤</span> Inquilinos</a>
-          <a href="#"            className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>📊</span> Reajuste</a>
-          <a href="#"            className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>🗓️</span> Vistorias</a>
-        </nav>
-      </aside>
+        <Sidebar />
 
       {/* Main */}
       <main className="flex-1 p-8">
