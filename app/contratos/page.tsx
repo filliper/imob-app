@@ -7,29 +7,47 @@ import jsPDF from 'jspdf'
 import Sidebar from '@/app/components/Sidebar'
 
 
-type Property = { id: string; name: string; address: string; rent_value: number }
-type Tenant = { id: string; name: string; cpf: string; email: string; phone: string }
+type Owner = {
+  id: string
+  name: string
+  cpf: string
+  rg: string
+  address: string
+  phone: string
+  email: string
+}
+
+type Property = {
+  id: string
+  name: string
+  address: string
+  rent_value: number
+  owner_id: string
+  owners: Owner | null
+}
+
+type Tenant = {
+  id: string
+  name: string
+  cpf: string
+  email: string
+  phone: string
+}
+
 type Contract = {
   id: string
   type: string
   start_date: string
-  end_date: string | null
+  end_date: string
   value: number
+  indice_reajuste: string
+  multa_rescisao: string
+  fiador_nome: string
+  fiador_cpf: string
+  fiador_rg: string
+  fiador_endereco: string
   properties: Property
   tenants: Tenant
-  indice_reajuste?: string | null
-  multa_rescisao?: string | null
-  fiador_nome?: string | null
-  fiador_cpf?: string | null
-  fiador_rg?: string | null
-  fiador_endereco?: string | null
-}
-
-type Fiador = {
-  nome: string
-  cpf: string
-  rg: string
-  endereco: string
 }
 
 export default function ContratosPage() {
@@ -66,7 +84,9 @@ export default function ContratosPage() {
     if (!user) { router.push('/login'); return }
 
     const [{ data: c }, { data: p }, { data: t }] = await Promise.all([
-      supabase.from('contracts').select('*, properties(*), tenants(*)').order('created_at', { ascending: false }),
+      supabase.from('contracts').select(`*,
+            properties(*, owners(*)),
+            tenants(*)`).order('created_at', { ascending: false }),
       supabase.from('properties').select('*'),
       supabase.from('tenants').select('*'),
     ])
@@ -122,209 +142,208 @@ export default function ContratosPage() {
     setSaving(false)
   }
 
-    async function generatePDF(contract: Contract) {
-    const doc = new jsPDF()
-    const pageWidth = doc.internal.pageSize.getWidth()
-    const margin = 20
-    const contentWidth = pageWidth - margin * 2
+async function generatePDF(contract: Contract) {
+  const doc = new jsPDF()
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const margin = 20
+  const contentWidth = pageWidth - margin * 2
 
-    // Buscar perfil do locador
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: perfil } = await supabase.from('user_profiles').select('*').eq('id', user!.id).single()
+  const property = contract.properties
+  const tenant = contract.tenants
+  const owner = property?.owners
 
-    const property = contract.properties
-    const tenant = contract.tenants
+  // ── CABEÇALHO ──
+  doc.setFillColor(30, 64, 175)
+  doc.rect(0, 0, pageWidth, 38, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
 
-    // ── CABEÇALHO ──
-    doc.setFillColor(30, 64, 175)
-    doc.rect(0, 0, pageWidth, 38, 'F')
+  const titles: Record<string, string> = {
+    rental: 'CONTRATO DE LOCAÇÃO RESIDENCIAL',
+    service: 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS',
+    sale: 'CONTRATO DE COMPRA E VENDA',
+  }
+  doc.text(titles[contract.type] ?? 'CONTRATO', pageWidth / 2, 16, { align: 'center' })
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} · ImobApp`, pageWidth / 2, 26, { align: 'center' })
+  doc.setTextColor(0, 0, 0)
 
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(16)
-    doc.setFont('helvetica', 'bold')
+  let y = 48
 
-    const titles: Record<string, string> = {
-        rental: 'CONTRATO DE LOCAÇÃO RESIDENCIAL',
-        service: 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS',
-        sale: 'CONTRATO DE COMPRA E VENDA',
-    }
-    doc.text(titles[contract.type] ?? 'CONTRATO', pageWidth / 2, 16, { align: 'center' })
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} · ImobApp`, pageWidth / 2, 26, { align: 'center' })
-    doc.setTextColor(0, 0, 0)
+  // ── QUALIFICAÇÃO DAS PARTES ──
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'bold')
+  doc.setFillColor(240, 245, 255)
+  doc.rect(margin, y, contentWidth, 7, 'F')
+  doc.text('1. QUALIFICAÇÃO DAS PARTES', margin + 3, y + 5)
+  y += 12
 
-    let y = 48
+  // LOCADOR — dados do proprietário do imóvel
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'bold')
+  doc.text('LOCADOR(A):', margin, y)
+  doc.setFont('helvetica', 'normal')
+  y += 6
 
-    // ── QUALIFICAÇÃO DAS PARTES ──
-    doc.setFontSize(11)
-    doc.setFont('helvetica', 'bold')
-    doc.setFillColor(240, 245, 255)
-    doc.rect(margin, y, contentWidth, 7, 'F')
-    doc.text('1. QUALIFICAÇÃO DAS PARTES', margin + 3, y + 5)
-    y += 12
-
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'bold')
-    doc.text('LOCADOR(A):', margin, y)
-    doc.setFont('helvetica', 'normal')
+  if (owner?.name) {
+    doc.text(`Nome: ${owner.name}`, margin + 4, y); y += 6
+    if (owner.cpf) { doc.text(`CPF: ${owner.cpf}`, margin + 4, y); y += 6 }
+    if (owner.rg) { doc.text(`RG: ${owner.rg}`, margin + 4, y); y += 6 }
+    if (owner.address) { doc.text(`Endereço: ${owner.address}`, margin + 4, y); y += 6 }
+    if (owner.phone) { doc.text(`Telefone: ${owner.phone}`, margin + 4, y); y += 6 }
+    if (owner.email) { doc.text(`E-mail: ${owner.email}`, margin + 4, y); y += 6 }
+  } else {
+    doc.setTextColor(150)
+    doc.text('(Proprietário não vinculado ao imóvel — vincule em Imóveis)', margin + 4, y)
+    doc.setTextColor(0)
     y += 6
-    if (perfil?.full_name) {
-        doc.text(`Nome: ${perfil.full_name}`, margin + 4, y); y += 6
-        if (perfil.cpf) { doc.text(`CPF: ${perfil.cpf}`, margin + 4, y); y += 6 }
-        if (perfil.rg) { doc.text(`RG: ${perfil.rg}`, margin + 4, y); y += 6 }
-        if (perfil.address) { doc.text(`Endereço: ${perfil.address}`, margin + 4, y); y += 6 }
-        if (perfil.phone) { doc.text(`Telefone: ${perfil.phone}`, margin + 4, y); y += 6 }
-    } else {
-        doc.setTextColor(150)
-        doc.text('(Preencha seus dados em "Meu Perfil" para aparecerem aqui)', margin + 4, y)
-        doc.setTextColor(0)
-        y += 6
-    }
+  }
 
+  y += 4
+  doc.setFont('helvetica', 'bold')
+  doc.text('LOCATÁRIO(A):', margin, y)
+  doc.setFont('helvetica', 'normal')
+  y += 6
+  doc.text(`Nome: ${tenant.name}`, margin + 4, y); y += 6
+  doc.text(`CPF: ${tenant.cpf}`, margin + 4, y); y += 6
+  if (tenant.email) { doc.text(`E-mail: ${tenant.email}`, margin + 4, y); y += 6 }
+  if (tenant.phone) { doc.text(`Telefone: ${tenant.phone}`, margin + 4, y); y += 6 }
+
+  if (contract.fiador_nome) {
     y += 4
     doc.setFont('helvetica', 'bold')
-    doc.text('LOCATÁRIO(A):', margin, y)
+    doc.text('FIADOR(A):', margin, y)
     doc.setFont('helvetica', 'normal')
     y += 6
-    doc.text(`Nome: ${tenant.name}`, margin + 4, y); y += 6
-    doc.text(`CPF: ${tenant.cpf}`, margin + 4, y); y += 6
-    if (tenant.email) { doc.text(`E-mail: ${tenant.email}`, margin + 4, y); y += 6 }
-    if (tenant.phone) { doc.text(`Telefone: ${tenant.phone}`, margin + 4, y); y += 6 }
+    doc.text(`Nome: ${contract.fiador_nome}`, margin + 4, y); y += 6
+    if (contract.fiador_cpf) { doc.text(`CPF: ${contract.fiador_cpf}`, margin + 4, y); y += 6 }
+    if (contract.fiador_rg) { doc.text(`RG: ${contract.fiador_rg}`, margin + 4, y); y += 6 }
+    if (contract.fiador_endereco) { doc.text(`Endereço: ${contract.fiador_endereco}`, margin + 4, y); y += 6 }
+  }
 
-    if (contract.fiador_nome) {
-        y += 4
-        doc.setFont('helvetica', 'bold')
-        doc.text('FIADOR(A):', margin, y)
-        doc.setFont('helvetica', 'normal')
-        y += 6
-        doc.text(`Nome: ${contract.fiador_nome}`, margin + 4, y); y += 6
-        if (contract.fiador_cpf) { doc.text(`CPF: ${contract.fiador_cpf}`, margin + 4, y); y += 6 }
-        if (contract.fiador_rg) { doc.text(`RG: ${contract.fiador_rg}`, margin + 4, y); y += 6 }
-        if (contract.fiador_endereco) { doc.text(`Endereço: ${contract.fiador_endereco}`, margin + 4, y); y += 6 }
-    }
+  y += 6
 
-    y += 6
+  // ── DO IMÓVEL ──
+  doc.setFont('helvetica', 'bold')
+  doc.setFillColor(240, 245, 255)
+  doc.rect(margin, y, contentWidth, 7, 'F')
+  doc.text('2. DO IMÓVEL', margin + 3, y + 5)
+  y += 12
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.text(`O imóvel objeto deste contrato está localizado à: ${property.address}`, margin + 4, y, { maxWidth: contentWidth - 4 })
+  y += 12
 
-    // ── DO IMÓVEL ──
-    doc.setFont('helvetica', 'bold')
-    doc.setFillColor(240, 245, 255)
-    doc.rect(margin, y, contentWidth, 7, 'F')
-    doc.text('2. DO IMÓVEL', margin + 3, y + 5)
-    y += 12
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    doc.text(`O imóvel objeto deste contrato está localizado à: ${property.address}`, margin + 4, y, { maxWidth: contentWidth - 4 })
-    y += 12
+  // ── DO PRAZO ──
+  doc.setFont('helvetica', 'bold')
+  doc.setFillColor(240, 245, 255)
+  doc.rect(margin, y, contentWidth, 7, 'F')
+  doc.text('3. DO PRAZO', margin + 3, y + 5)
+  y += 12
+  doc.setFont('helvetica', 'normal')
+  const startFormatted = new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
+  const endFormatted = contract.end_date
+    ? new Date(contract.end_date + 'T12:00:00').toLocaleDateString('pt-BR')
+    : 'indeterminado'
+  doc.text(`O presente contrato terá início em ${startFormatted} e término em ${endFormatted}.`, margin + 4, y, { maxWidth: contentWidth - 4 })
+  y += 12
 
-    // ── DO PRAZO ──
-    doc.setFont('helvetica', 'bold')
-    doc.setFillColor(240, 245, 255)
-    doc.rect(margin, y, contentWidth, 7, 'F')
-    doc.text('3. DO PRAZO', margin + 3, y + 5)
-    y += 12
-    doc.setFont('helvetica', 'normal')
-    const startFormatted = new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
-    const endFormatted = contract.end_date
-        ? new Date(contract.end_date + 'T12:00:00').toLocaleDateString('pt-BR')
-        : 'indeterminado'
-    doc.text(`O presente contrato terá início em ${startFormatted} e término em ${endFormatted}.`, margin + 4, y, { maxWidth: contentWidth - 4 })
-    y += 12
+  // ── DO VALOR ──
+  doc.setFont('helvetica', 'bold')
+  doc.setFillColor(240, 245, 255)
+  doc.rect(margin, y, contentWidth, 7, 'F')
+  doc.text('4. DO VALOR E REAJUSTE', margin + 3, y + 5)
+  y += 12
+  doc.setFont('helvetica', 'normal')
+  const valueFormatted = contract.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  doc.text(`O aluguel mensal fica estabelecido em ${valueFormatted}, a ser pago até o dia 10 de cada mês.`, margin + 4, y, { maxWidth: contentWidth - 4 })
+  y += 8
+  const indice = contract.indice_reajuste ?? 'IPCA'
+  doc.text(`O valor será reajustado anualmente com base no índice ${indice}, conforme legislação vigente.`, margin + 4, y, { maxWidth: contentWidth - 4 })
+  y += 12
 
-    // ── DO VALOR ──
-    doc.setFont('helvetica', 'bold')
-    doc.setFillColor(240, 245, 255)
-    doc.rect(margin, y, contentWidth, 7, 'F')
-    doc.text('4. DO VALOR E REAJUSTE', margin + 3, y + 5)
-    y += 12
-    doc.setFont('helvetica', 'normal')
-    const valueFormatted = contract.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-    doc.text(`O aluguel mensal fica estabelecido em ${valueFormatted}, a ser pago até o dia 10 de cada mês.`, margin + 4, y, { maxWidth: contentWidth - 4 })
-    y += 8
-    const indice = contract.indice_reajuste ?? 'IPCA'
-    doc.text(`O valor será reajustado anualmente com base no índice ${indice}, conforme legislação vigente.`, margin + 4, y, { maxWidth: contentWidth - 4 })
-    y += 12
+  // ── DAS OBRIGAÇÕES ──
+  doc.setFont('helvetica', 'bold')
+  doc.setFillColor(240, 245, 255)
+  doc.rect(margin, y, contentWidth, 7, 'F')
+  doc.text('5. DAS OBRIGAÇÕES DO LOCATÁRIO', margin + 3, y + 5)
+  y += 12
+  doc.setFont('helvetica', 'normal')
+  const obrigacoes = [
+    '5.1 Pagar pontualmente o aluguel na data convencionada.',
+    '5.2 Conservar o imóvel e realizar pequenos reparos de manutenção.',
+    '5.3 Não sublocar, ceder ou emprestar o imóvel sem autorização escrita do locador.',
+    '5.4 Restituir o imóvel ao término do contrato nas mesmas condições recebidas.',
+    '5.5 Não realizar modificações estruturais sem prévia autorização por escrito.',
+    '5.6 Permitir vistorias periódicas com aviso prévio de 24 horas.',
+  ]
+  obrigacoes.forEach(o => {
+    doc.text(o, margin + 4, y, { maxWidth: contentWidth - 4 }); y += 7
+  })
+  y += 4
 
-    // ── DAS OBRIGAÇÕES ──
-    doc.setFont('helvetica', 'bold')
-    doc.setFillColor(240, 245, 255)
-    doc.rect(margin, y, contentWidth, 7, 'F')
-    doc.text('5. DAS OBRIGAÇÕES DO LOCATÁRIO', margin + 3, y + 5)
-    y += 12
-    doc.setFont('helvetica', 'normal')
-    const obrigacoes = [
-        '5.1 Pagar pontualmente o aluguel na data convencionada.',
-        '5.2 Conservar o imóvel e realizar pequenos reparos de manutenção.',
-        '5.3 Não sublocar, ceder ou emprestar o imóvel sem autorização escrita do locador.',
-        '5.4 Restituir o imóvel ao término do contrato nas mesmas condições recebidas.',
-        '5.5 Não realizar modificações estruturais sem prévia autorização por escrito.',
-        '5.6 Permitir vistorias periódicas com aviso prévio de 24 horas.',
-    ]
-    obrigacoes.forEach(o => {
-        doc.text(o, margin + 4, y, { maxWidth: contentWidth - 4 })
-        y += 7
-    })
-    y += 4
+  // ── DA RESCISÃO ──
+  doc.setFont('helvetica', 'bold')
+  doc.setFillColor(240, 245, 255)
+  doc.rect(margin, y, contentWidth, 7, 'F')
+  doc.text('6. DA RESCISÃO E MULTA', margin + 3, y + 5)
+  y += 12
+  doc.setFont('helvetica', 'normal')
+  const meses = contract.multa_rescisao ?? '3'
+  const mesesLabel = meses === '1' ? 'um' : meses === '2' ? 'dois' : 'três'
+  doc.text(`Em caso de rescisão antecipada pelo locatário, será devida multa equivalente a ${meses} (${mesesLabel}) mês(es) de aluguel.`, margin + 4, y, { maxWidth: contentWidth - 4 })
+  y += 8
+  doc.text('A rescisão pelo locador sem justa causa implica devolução proporcional dos valores pagos.', margin + 4, y, { maxWidth: contentWidth - 4 })
+  y += 12
 
-    // ── DA RESCISÃO ──
-    doc.setFont('helvetica', 'bold')
-    doc.setFillColor(240, 245, 255)
-    doc.rect(margin, y, contentWidth, 7, 'F')
-    doc.text('6. DA RESCISÃO E MULTA', margin + 3, y + 5)
-    y += 12
-    doc.setFont('helvetica', 'normal')
-    const meses = contract.multa_rescisao ?? '3'
-    doc.text(`Em caso de rescisão antecipada pelo locatário, será devida multa equivalente a ${meses} (${meses === '1' ? 'um' : meses === '2' ? 'dois' : 'três'}) mês(es) de aluguel.`, margin + 4, y, { maxWidth: contentWidth - 4 })
-    y += 8
-    doc.text('A rescisão pelo locador sem justa causa implica devolução proporcional dos valores pagos.', margin + 4, y, { maxWidth: contentWidth - 4 })
-    y += 12
+  // ── DISPOSIÇÕES GERAIS ──
+  doc.setFont('helvetica', 'bold')
+  doc.setFillColor(240, 245, 255)
+  doc.rect(margin, y, contentWidth, 7, 'F')
+  doc.text('7. DISPOSIÇÕES GERAIS', margin + 3, y + 5)
+  y += 12
+  doc.setFont('helvetica', 'normal')
+  doc.text('O presente contrato é regido pela Lei do Inquilinato (Lei nº 8.245/91) e pelo Código Civil Brasileiro.', margin + 4, y, { maxWidth: contentWidth - 4 })
+  y += 8
+  doc.text('Fica eleito o foro da comarca local para dirimir quaisquer dúvidas oriundas deste contrato.', margin + 4, y, { maxWidth: contentWidth - 4 })
+  y += 16
 
-    // ── DISPOSIÇÕES GERAIS ──
-    doc.setFont('helvetica', 'bold')
-    doc.setFillColor(240, 245, 255)
-    doc.rect(margin, y, contentWidth, 7, 'F')
-    doc.text('7. DISPOSIÇÕES GERAIS', margin + 3, y + 5)
-    y += 12
-    doc.setFont('helvetica', 'normal')
-    doc.text('O presente contrato é regido pela Lei do Inquilinato (Lei nº 8.245/91) e pelo Código Civil Brasileiro.', margin + 4, y, { maxWidth: contentWidth - 4 })
-    y += 8
-    doc.text('Fica eleito o foro da comarca de Campinas/SP para dirimir quaisquer dúvidas oriundas deste contrato.', margin + 4, y, { maxWidth: contentWidth - 4 })
-    y += 16
+  // ── ASSINATURAS ──
+  if (y > 230) { doc.addPage(); y = 20 }
 
-    // ── ASSINATURAS ──
-    if (y > 230) { doc.addPage(); y = 20 }
+  doc.setDrawColor(180)
+  doc.line(margin, y, pageWidth / 2 - 10, y)
+  doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+  y += 5
+  doc.setFontSize(9)
+  doc.text(owner?.name ?? 'Locador(a)', pageWidth / 4, y, { align: 'center' })
+  doc.text(tenant.name, (pageWidth / 4) * 3, y, { align: 'center' })
+  y += 4
+  doc.setTextColor(120)
+  doc.text('LOCADOR(A)', pageWidth / 4, y, { align: 'center' })
+  doc.text('LOCATÁRIO(A)', (pageWidth / 4) * 3, y, { align: 'center' })
+  doc.setTextColor(0)
 
-    doc.setDrawColor(180)
-    doc.line(margin, y, pageWidth / 2 - 10, y)
-    doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+  if (contract.fiador_nome) {
+    y += 14
+    doc.line(pageWidth / 2 - 55, y, pageWidth / 2 + 55, y)
     y += 5
-    doc.setFontSize(9)
-    doc.text(perfil?.full_name ?? 'Locador(a)', pageWidth / 4, y, { align: 'center' })
-    doc.text(tenant.name, (pageWidth / 4) * 3, y, { align: 'center' })
+    doc.text(contract.fiador_nome, pageWidth / 2, y, { align: 'center' })
     y += 4
     doc.setTextColor(120)
-    doc.text('LOCADOR(A)', pageWidth / 4, y, { align: 'center' })
-    doc.text('LOCATÁRIO(A)', (pageWidth / 4) * 3, y, { align: 'center' })
+    doc.text('FIADOR(A)', pageWidth / 2, y, { align: 'center' })
     doc.setTextColor(0)
+  }
 
-    if (contract.fiador_nome) {
-        y += 14
-        doc.line(pageWidth / 2 - 55, y, pageWidth / 2 + 55, y)
-        y += 5
-        doc.text(contract.fiador_nome, pageWidth / 2, y, { align: 'center' })
-        y += 4
-        doc.setTextColor(120)
-        doc.text('FIADOR(A)', pageWidth / 2, y, { align: 'center' })
-        doc.setTextColor(0)
-    }
+  // ── RODAPÉ ──
+  doc.setFontSize(7)
+  doc.setTextColor(150)
+  doc.text('Gerado por ImobApp · imobapp.com.br', pageWidth / 2, 290, { align: 'center' })
 
-    // ── RODAPÉ ──
-    doc.setFontSize(7)
-    doc.setTextColor(150)
-    doc.text('Gerado por ImobApp · imobapp.com.br', pageWidth / 2, 290, { align: 'center' })
-
-    doc.save(`contrato-${tenant.name.toLowerCase().replace(/ /g, '-')}.pdf`)
-    }
+  doc.save(`contrato-${tenant.name.toLowerCase().replace(/ /g, '-')}.pdf`)
+}
 
   const typeLabel: Record<string, string> = {
     rental: 'Aluguel',
