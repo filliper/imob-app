@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import Sidebar from '@/app/components/Sidebar'
 
 export default function Dashboard() {
   const [userEmail, setUserEmail] = useState('')
@@ -55,30 +56,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50 flex">
 
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-gray-900">ImobApp</h1>
-          <p className="text-xs text-gray-500 mt-1">Gestão imobiliária</p>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-1">
-          <a href="/dashboard"  className="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium"><span>🏠</span> Dashboard</a>
-          <a href="/contratos"  className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>📄</span> Contratos</a>
-          <a href="/imoveis"    className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>🏢</span> Imóveis</a>
-          <a href="/inquilinos" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>👤</span> Inquilinos</a>
-          <a href="/reajuste"   className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>📊</span> Reajuste</a>
-          <a href="/vistorias"  className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 text-sm"><span>🗓️</span> Vistorias</a>
-        </nav>
-        <div className="p-4 border-t border-gray-200">
-          <p className="text-xs text-gray-500 truncate mb-2">{userEmail}</p>
-          <button
-            onClick={handleLogout}
-            className="w-full text-left text-sm text-red-500 hover:text-red-700 px-3 py-2 rounded-lg hover:bg-red-50"
-          >
-            Sair
-          </button>
-        </div>
-      </aside>
+      <Sidebar />
 
       {/* Main */}
       <main className="flex-1 p-8">
