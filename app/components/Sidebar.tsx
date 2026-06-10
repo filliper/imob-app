@@ -6,14 +6,15 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 const links = [
-  { href: '/dashboard',  icon: '🏠', label: 'Dashboard' },
-  { href: '/crm',        icon: '🎯', label: 'CRM / Leads' },
-  { href: '/contratos',  icon: '📄', label: 'Contratos' },
-  { href: '/imoveis',    icon: '🏢', label: 'Imóveis' },
-  { href: '/inquilinos', icon: '👤', label: 'Inquilinos' },
-  { href: '/reajuste',   icon: '📊', label: 'Reajuste' },
-  { href: '/vistorias',  icon: '🗓️', label: 'Vistorias' },
-  { href: '/perfil',     icon: '⚙️', label: 'Meu perfil' },
+  { href: '/dashboard',      icon: '🏠', label: 'Dashboard' },
+  { href: '/crm',            icon: '🎯', label: 'CRM / Leads' },
+  { href: '/contratos',      icon: '📄', label: 'Contratos' },
+  { href: '/imoveis',        icon: '🏢', label: 'Imóveis' },
+  { href: '/proprietarios',  icon: '👔', label: 'Proprietários' },
+  { href: '/inquilinos',     icon: '👤', label: 'Inquilinos' },
+  { href: '/reajuste',       icon: '📊', label: 'Reajuste' },
+  { href: '/vistorias',      icon: '🗓️', label: 'Vistorias' },
+  { href: '/perfil',         icon: '⚙️', label: 'Meu perfil' },
 ]
 
 export default function Sidebar() {

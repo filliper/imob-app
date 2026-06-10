@@ -13,16 +13,21 @@ type Property = {
   rent_value: number
 }
 
+type Owner = { id: string; name: string }
+
+
 export default function ImoveisPage() {
   const [properties, setProperties] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [owners, setOwners] = useState<Owner[]>([])
   const [form, setForm] = useState({
     name: '',
     address: '',
     type: 'residential',
     rent_value: '',
+    owner_id: '' as string,
   })
 
   const supabase = createClient()
@@ -40,8 +45,12 @@ export default function ImoveisPage() {
       .from('properties')
       .select('*')
       .order('created_at', { ascending: false })
-
     setProperties(data ?? [])
+    const { data: o } = await supabase
+      .from('owners')
+      .select('id, name')
+    setOwners(o ?? [])
+
     setLoading(false)
   }
 
@@ -60,12 +69,13 @@ export default function ImoveisPage() {
       address: form.address,
       type: form.type,
       rent_value: parseFloat(form.rent_value),
+      owner_id: form.owner_id || null,
     })
 
     if (error) {
       alert('Erro ao salvar: ' + error.message)
     } else {
-      setForm({ name: '', address: '', type: 'residential', rent_value: '' })
+      setForm({ name: '', address: '', type: 'residential', rent_value: '', owner_id: '' })
       setShowForm(false)
       loadProperties()
     }
@@ -145,6 +155,16 @@ export default function ImoveisPage() {
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+            </div>
+            <div>
+                <label className="text-sm font-medium text-gray-700">Proprietário</label>
+                <select
+                    value={form.owner_id ?? ''}
+                    onChange={e => setForm({ ...form, owner_id: e.target.value })}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Sem proprietário</option>
+                    {owners.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
             </div>
             <div className="flex gap-3 mt-5">
               <button
