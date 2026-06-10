@@ -85,7 +85,7 @@ export default function ImoveisPage() {
 
 function startEdit(p: Property) {
   setEditingId(p.id)
-  setForm({ name: p.name, address: p.address, type: p.type, rent_value: p.rent_value.toString() })
+  setForm({ name: p.name, address: p.address, type: p.type, rent_value: p.rent_value.toString(), owner_id: '' })
   setShowForm(true)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -177,16 +177,6 @@ function startEdit(p: Property) {
               >
                 {saving ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Salvar imóvel'}
               </button>
-<div className="flex gap-2 border-t border-gray-100 pt-3 mt-3">
-  <button onClick={() => startEdit(p)}
-    className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">
-    ✏️ Editar
-  </button>
-  <button onClick={() => handleDelete(p.id)}
-    className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50">
-    🗑️ Remover
-  </button>
-</div>
               <button
                 onClick={() => setShowForm(false)}
                 className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
@@ -223,12 +213,16 @@ function startEdit(p: Property) {
                       </span>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDelete(p.id)}
-                    className="text-gray-400 hover:text-red-500 text-lg"
-                  >
-                    ✕
-                  </button>
+                    <div className="flex gap-2 border-t border-gray-100 pt-3 mt-3">
+                        <button onClick={() => startEdit(p)}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">
+                            ✏️ Editar
+                        </button>
+                        <button onClick={() => handleDelete(p.id)}
+                            className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50">
+                            🗑️ Remover
+                        </button>
+                    </div>
                 </div>
               </div>
             ))}

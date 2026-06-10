@@ -18,6 +18,7 @@ export default function InquilinosPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', cpf: '', email: '', phone: '' })
 
   const supabase = createClient()
@@ -33,26 +34,29 @@ export default function InquilinosPage() {
     setLoading(false)
   }
 
-  async function handleSave() {
-    if (!form.name || !form.cpf) { alert('Nome e CPF são obrigatórios'); return }
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { error } = await supabase.from('tenants').insert({
-      user_id: user!.id,
-      name: form.name,
-      cpf: form.cpf,
-      email: form.email,
-      phone: form.phone,
-    })
-    if (error) { alert('Erro: ' + error.message) }
-    else {
-      setForm({ name: '', cpf: '', email: '', phone: '' })
-      setShowForm(false)
-      loadTenants()
+    async function handleSave() {
+        if (!form.name || !form.cpf) { alert('Nome e CPF são obrigatórios'); return }
+        setSaving(true)
+        if (editingId) {
+            await supabase.from('tenants').update(form).eq('id', editingId)
+        } else {
+            const { data: { user } } = await supabase.auth.getUser()
+            await supabase.from('tenants').insert({ user_id: user!.id, ...form })
+        }
+        setForm({ name: '', cpf: '', email: '', phone: '' })
+        setEditingId(null)
+        setShowForm(false)
+        loadTenants()
+        setSaving(false)
     }
-    setSaving(false)
-  }
 
+    function startEdit(t: Tenant) {
+        setEditingId(t.id)
+        setForm({ name: t.name, cpf: t.cpf, email: t.email ?? '', phone: t.phone ?? '' })
+        setShowForm(true)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  
   async function handleDelete(id: string) {
     if (!confirm('Remover este inquilino?')) return
     await supabase.from('tenants').delete().eq('id', id)
@@ -135,7 +139,16 @@ export default function InquilinosPage() {
                     {t.email && <p className="text-sm text-gray-500">{t.email}</p>}
                     {t.phone && <p className="text-sm text-gray-500">{t.phone}</p>}
                   </div>
-                  <button onClick={() => handleDelete(t.id)} className="text-gray-400 hover:text-red-500 text-lg">✕</button>
+                    <div className="flex gap-2 border-t border-gray-100 pt-3 mt-3">
+                        <button onClick={() => startEdit(t)}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">
+                            ✏️ Editar
+                        </button>
+                        <button onClick={() => handleDelete(t.id)}
+                            className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50">
+                            🗑️ Remover
+                        </button>
+                    </div>
                 </div>
               </div>
             ))}
