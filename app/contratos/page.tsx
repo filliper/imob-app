@@ -13,10 +13,23 @@ type Contract = {
   id: string
   type: string
   start_date: string
-  end_date: string
+  end_date: string | null
   value: number
   properties: Property
   tenants: Tenant
+  indice_reajuste?: string | null
+  multa_rescisao?: string | null
+  fiador_nome?: string | null
+  fiador_cpf?: string | null
+  fiador_rg?: string | null
+  fiador_endereco?: string | null
+}
+
+type Fiador = {
+  nome: string
+  cpf: string
+  rg: string
+  endereco: string
 }
 
 export default function ContratosPage() {
@@ -27,16 +40,24 @@ export default function ContratosPage() {
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
-    property_id: '',
-    tenant_id: '',
-    type: 'rental',
-    start_date: '',
-    end_date: '',
-    value: '',
-  })
+        property_id: '',
+        tenant_id: '',
+        type: 'rental',
+        start_date: '',
+        end_date: '',
+        value: '',
+        indice_reajuste: 'IPCA',
+        multa_rescisao: '3',
+        tem_fiador: false,
+        fiador_nome: '',
+        fiador_cpf: '',
+        fiador_rg: '',
+        fiador_endereco: '',
+    }) 
 
   const supabase = createClient()
   const router = useRouter()
+
 
   useEffect(() => { loadAll() }, [])
 
@@ -64,132 +85,246 @@ export default function ContratosPage() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     const { error } = await supabase.from('contracts').insert({
-      user_id: user!.id,
-      property_id: form.property_id,
-      tenant_id: form.tenant_id,
-      type: form.type,
-      start_date: form.start_date,
-      end_date: form.end_date || null,
-      value: parseFloat(form.value),
+        user_id: user!.id,
+        property_id: form.property_id,
+        tenant_id: form.tenant_id,
+        type: form.type,
+        start_date: form.start_date,
+        end_date: form.end_date || null,
+        value: parseFloat(form.value),
+        indice_reajuste: form.indice_reajuste,
+        multa_rescisao: form.multa_rescisao,
+        fiador_nome: form.tem_fiador ? form.fiador_nome : null,
+        fiador_cpf: form.tem_fiador ? form.fiador_cpf : null,
+        fiador_rg: form.tem_fiador ? form.fiador_rg : null,
+        fiador_endereco: form.tem_fiador ? form.fiador_endereco : null,
     })
     if (error) { alert('Erro: ' + error.message) }
     else {
-      setForm({ property_id: '', tenant_id: '', type: 'rental', start_date: '', end_date: '', value: '' })
+      setForm({
+        property_id: '',
+        tenant_id: '',
+        type: 'rental',
+        start_date: '',
+        end_date: '',
+        value: '',
+        indice_reajuste: 'IPCA',
+        multa_rescisao: '3',
+        tem_fiador: false,
+        fiador_nome: '',
+        fiador_cpf: '',
+        fiador_rg: '',
+        fiador_endereco: '',
+      })
       setShowForm(false)
       loadAll()
     }
     setSaving(false)
   }
 
-  function generatePDF(contract: Contract) {
+    async function generatePDF(contract: Contract) {
     const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 20
+    const contentWidth = pageWidth - margin * 2
+
+    // Buscar perfil do locador
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: perfil } = await supabase.from('user_profiles').select('*').eq('id', user!.id).single()
+
     const property = contract.properties
     const tenant = contract.tenants
-    const pageWidth = doc.internal.pageSize.getWidth()
 
-    // Cabeçalho
-    doc.setFontSize(20)
+    // ── CABEÇALHO ──
+    doc.setFillColor(30, 64, 175)
+    doc.rect(0, 0, pageWidth, 38, 'F')
+
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(16)
     doc.setFont('helvetica', 'bold')
-    doc.text('CONTRATO DE LOCAÇÃO RESIDENCIAL', pageWidth / 2, 30, { align: 'center' })
 
-    doc.setFontSize(11)
+    const titles: Record<string, string> = {
+        rental: 'CONTRATO DE LOCAÇÃO RESIDENCIAL',
+        service: 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS',
+        sale: 'CONTRATO DE COMPRA E VENDA',
+    }
+    doc.text(titles[contract.type] ?? 'CONTRATO', pageWidth / 2, 16, { align: 'center' })
+    doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
-    doc.setTextColor(100)
-    doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} pelo ImobApp`, pageWidth / 2, 40, { align: 'center' })
+    doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} · ImobApp`, pageWidth / 2, 26, { align: 'center' })
+    doc.setTextColor(0, 0, 0)
 
-    // Linha separadora
-    doc.setDrawColor(200)
-    doc.line(20, 46, 190, 46)
-    doc.setTextColor(0)
+    let y = 48
 
-    // Seção 1 - Imóvel
-    doc.setFontSize(13)
-    doc.setFont('helvetica', 'bold')
-    doc.text('1. DO IMÓVEL', 20, 58)
-
+    // ── QUALIFICAÇÃO DAS PARTES ──
     doc.setFontSize(11)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`O imóvel objeto deste contrato está localizado à:`, 20, 68)
     doc.setFont('helvetica', 'bold')
-    doc.text(property.address, 20, 76)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Identificação: ${property.name}`, 20, 84)
+    doc.setFillColor(240, 245, 255)
+    doc.rect(margin, y, contentWidth, 7, 'F')
+    doc.text('1. QUALIFICAÇÃO DAS PARTES', margin + 3, y + 5)
+    y += 12
 
-    // Seção 2 - Locatário
-    doc.setFontSize(13)
+    doc.setFontSize(10)
     doc.setFont('helvetica', 'bold')
-    doc.text('2. DO LOCATÁRIO', 20, 100)
-
-    doc.setFontSize(11)
+    doc.text('LOCADOR(A):', margin, y)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Nome completo: ${tenant.name}`, 20, 110)
-    doc.text(`CPF: ${tenant.cpf}`, 20, 118)
-    if (tenant.email) doc.text(`E-mail: ${tenant.email}`, 20, 126)
-    if (tenant.phone) doc.text(`Telefone: ${tenant.phone}`, 20, 134)
+    y += 6
+    if (perfil?.full_name) {
+        doc.text(`Nome: ${perfil.full_name}`, margin + 4, y); y += 6
+        if (perfil.cpf) { doc.text(`CPF: ${perfil.cpf}`, margin + 4, y); y += 6 }
+        if (perfil.rg) { doc.text(`RG: ${perfil.rg}`, margin + 4, y); y += 6 }
+        if (perfil.address) { doc.text(`Endereço: ${perfil.address}`, margin + 4, y); y += 6 }
+        if (perfil.phone) { doc.text(`Telefone: ${perfil.phone}`, margin + 4, y); y += 6 }
+    } else {
+        doc.setTextColor(150)
+        doc.text('(Preencha seus dados em "Meu Perfil" para aparecerem aqui)', margin + 4, y)
+        doc.setTextColor(0)
+        y += 6
+    }
 
-    // Seção 3 - Prazo
-    doc.setFontSize(13)
+    y += 4
     doc.setFont('helvetica', 'bold')
-    doc.text('3. DO PRAZO', 20, 150)
+    doc.text('LOCATÁRIO(A):', margin, y)
+    doc.setFont('helvetica', 'normal')
+    y += 6
+    doc.text(`Nome: ${tenant.name}`, margin + 4, y); y += 6
+    doc.text(`CPF: ${tenant.cpf}`, margin + 4, y); y += 6
+    if (tenant.email) { doc.text(`E-mail: ${tenant.email}`, margin + 4, y); y += 6 }
+    if (tenant.phone) { doc.text(`Telefone: ${tenant.phone}`, margin + 4, y); y += 6 }
 
-    doc.setFontSize(11)
+    if (contract.fiador_nome) {
+        y += 4
+        doc.setFont('helvetica', 'bold')
+        doc.text('FIADOR(A):', margin, y)
+        doc.setFont('helvetica', 'normal')
+        y += 6
+        doc.text(`Nome: ${contract.fiador_nome}`, margin + 4, y); y += 6
+        if (contract.fiador_cpf) { doc.text(`CPF: ${contract.fiador_cpf}`, margin + 4, y); y += 6 }
+        if (contract.fiador_rg) { doc.text(`RG: ${contract.fiador_rg}`, margin + 4, y); y += 6 }
+        if (contract.fiador_endereco) { doc.text(`Endereço: ${contract.fiador_endereco}`, margin + 4, y); y += 6 }
+    }
+
+    y += 6
+
+    // ── DO IMÓVEL ──
+    doc.setFont('helvetica', 'bold')
+    doc.setFillColor(240, 245, 255)
+    doc.rect(margin, y, contentWidth, 7, 'F')
+    doc.text('2. DO IMÓVEL', margin + 3, y + 5)
+    y += 12
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.text(`O imóvel objeto deste contrato está localizado à: ${property.address}`, margin + 4, y, { maxWidth: contentWidth - 4 })
+    y += 12
+
+    // ── DO PRAZO ──
+    doc.setFont('helvetica', 'bold')
+    doc.setFillColor(240, 245, 255)
+    doc.rect(margin, y, contentWidth, 7, 'F')
+    doc.text('3. DO PRAZO', margin + 3, y + 5)
+    y += 12
     doc.setFont('helvetica', 'normal')
     const startFormatted = new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
     const endFormatted = contract.end_date
-      ? new Date(contract.end_date + 'T12:00:00').toLocaleDateString('pt-BR')
-      : 'Indeterminado'
-    doc.text(`Início: ${startFormatted}`, 20, 160)
-    doc.text(`Término: ${endFormatted}`, 20, 168)
-    doc.text(`Duração: 30 (trinta) meses`, 20, 176)
+        ? new Date(contract.end_date + 'T12:00:00').toLocaleDateString('pt-BR')
+        : 'indeterminado'
+    doc.text(`O presente contrato terá início em ${startFormatted} e término em ${endFormatted}.`, margin + 4, y, { maxWidth: contentWidth - 4 })
+    y += 12
 
-    // Seção 4 - Valor
-    doc.setFontSize(13)
+    // ── DO VALOR ──
     doc.setFont('helvetica', 'bold')
-    doc.text('4. DO VALOR DO ALUGUEL', 20, 192)
-
-    doc.setFontSize(11)
+    doc.setFillColor(240, 245, 255)
+    doc.rect(margin, y, contentWidth, 7, 'F')
+    doc.text('4. DO VALOR E REAJUSTE', margin + 3, y + 5)
+    y += 12
     doc.setFont('helvetica', 'normal')
     const valueFormatted = contract.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-    doc.text(`O aluguel mensal fica estabelecido em ${valueFormatted}`, 20, 202)
-    doc.text(`a ser pago até o dia 10 (dez) de cada mês.`, 20, 210)
+    doc.text(`O aluguel mensal fica estabelecido em ${valueFormatted}, a ser pago até o dia 10 de cada mês.`, margin + 4, y, { maxWidth: contentWidth - 4 })
+    y += 8
+    const indice = contract.indice_reajuste ?? 'IPCA'
+    doc.text(`O valor será reajustado anualmente com base no índice ${indice}, conforme legislação vigente.`, margin + 4, y, { maxWidth: contentWidth - 4 })
+    y += 12
 
-    // Seção 5 - Cláusulas
-    doc.setFontSize(13)
+    // ── DAS OBRIGAÇÕES ──
     doc.setFont('helvetica', 'bold')
-    doc.text('5. DAS OBRIGAÇÕES DO LOCATÁRIO', 20, 226)
-
-    doc.setFontSize(10)
+    doc.setFillColor(240, 245, 255)
+    doc.rect(margin, y, contentWidth, 7, 'F')
+    doc.text('5. DAS OBRIGAÇÕES DO LOCATÁRIO', margin + 3, y + 5)
+    y += 12
     doc.setFont('helvetica', 'normal')
-    const clausulas = [
-      '5.1 Pagar pontualmente o aluguel na data convencionada.',
-      '5.2 Conservar o imóvel como se fosse seu, realizando pequenos reparos.',
-      '5.3 Não sublocar, ceder ou emprestar o imóvel sem autorização do locador.',
-      '5.4 Restituir o imóvel ao final do contrato nas mesmas condições em que o recebeu.',
-      '5.5 Não realizar modificações no imóvel sem prévia autorização por escrito.',
+    const obrigacoes = [
+        '5.1 Pagar pontualmente o aluguel na data convencionada.',
+        '5.2 Conservar o imóvel e realizar pequenos reparos de manutenção.',
+        '5.3 Não sublocar, ceder ou emprestar o imóvel sem autorização escrita do locador.',
+        '5.4 Restituir o imóvel ao término do contrato nas mesmas condições recebidas.',
+        '5.5 Não realizar modificações estruturais sem prévia autorização por escrito.',
+        '5.6 Permitir vistorias periódicas com aviso prévio de 24 horas.',
     ]
-    clausulas.forEach((c, i) => {
-      doc.text(c, 20, 236 + i * 8)
+    obrigacoes.forEach(o => {
+        doc.text(o, margin + 4, y, { maxWidth: contentWidth - 4 })
+        y += 7
     })
+    y += 4
 
-    // Assinaturas
-    doc.setFontSize(11)
-    doc.line(20, 286, 190, 286)
-    doc.text('Campinas/SP, ' + new Date().toLocaleDateString('pt-BR'), pageWidth / 2, 294, { align: 'center' })
+    // ── DA RESCISÃO ──
+    doc.setFont('helvetica', 'bold')
+    doc.setFillColor(240, 245, 255)
+    doc.rect(margin, y, contentWidth, 7, 'F')
+    doc.text('6. DA RESCISÃO E MULTA', margin + 3, y + 5)
+    y += 12
+    doc.setFont('helvetica', 'normal')
+    const meses = contract.multa_rescisao ?? '3'
+    doc.text(`Em caso de rescisão antecipada pelo locatário, será devida multa equivalente a ${meses} (${meses === '1' ? 'um' : meses === '2' ? 'dois' : 'três'}) mês(es) de aluguel.`, margin + 4, y, { maxWidth: contentWidth - 4 })
+    y += 8
+    doc.text('A rescisão pelo locador sem justa causa implica devolução proporcional dos valores pagos.', margin + 4, y, { maxWidth: contentWidth - 4 })
+    y += 12
 
-    doc.line(30, 315, 95, 315)
-    doc.text('Locador', 62, 322, { align: 'center' })
+    // ── DISPOSIÇÕES GERAIS ──
+    doc.setFont('helvetica', 'bold')
+    doc.setFillColor(240, 245, 255)
+    doc.rect(margin, y, contentWidth, 7, 'F')
+    doc.text('7. DISPOSIÇÕES GERAIS', margin + 3, y + 5)
+    y += 12
+    doc.setFont('helvetica', 'normal')
+    doc.text('O presente contrato é regido pela Lei do Inquilinato (Lei nº 8.245/91) e pelo Código Civil Brasileiro.', margin + 4, y, { maxWidth: contentWidth - 4 })
+    y += 8
+    doc.text('Fica eleito o foro da comarca de Campinas/SP para dirimir quaisquer dúvidas oriundas deste contrato.', margin + 4, y, { maxWidth: contentWidth - 4 })
+    y += 16
 
-    doc.line(115, 315, 180, 315)
-    doc.text(tenant.name, 147, 322, { align: 'center' })
-    doc.text('Locatário', 147, 329, { align: 'center' })
+    // ── ASSINATURAS ──
+    if (y > 230) { doc.addPage(); y = 20 }
 
-    // Rodapé
-    doc.setFontSize(8)
+    doc.setDrawColor(180)
+    doc.line(margin, y, pageWidth / 2 - 10, y)
+    doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+    y += 5
+    doc.setFontSize(9)
+    doc.text(perfil?.full_name ?? 'Locador(a)', pageWidth / 4, y, { align: 'center' })
+    doc.text(tenant.name, (pageWidth / 4) * 3, y, { align: 'center' })
+    y += 4
+    doc.setTextColor(120)
+    doc.text('LOCADOR(A)', pageWidth / 4, y, { align: 'center' })
+    doc.text('LOCATÁRIO(A)', (pageWidth / 4) * 3, y, { align: 'center' })
+    doc.setTextColor(0)
+
+    if (contract.fiador_nome) {
+        y += 14
+        doc.line(pageWidth / 2 - 55, y, pageWidth / 2 + 55, y)
+        y += 5
+        doc.text(contract.fiador_nome, pageWidth / 2, y, { align: 'center' })
+        y += 4
+        doc.setTextColor(120)
+        doc.text('FIADOR(A)', pageWidth / 2, y, { align: 'center' })
+        doc.setTextColor(0)
+    }
+
+    // ── RODAPÉ ──
+    doc.setFontSize(7)
     doc.setTextColor(150)
-    doc.text('Gerado por ImobApp · imobapp.com.br', pageWidth / 2, 285, { align: 'center' })
+    doc.text('Gerado por ImobApp · imobapp.com.br', pageWidth / 2, 290, { align: 'center' })
 
     doc.save(`contrato-${tenant.name.toLowerCase().replace(/ /g, '-')}.pdf`)
-  }
+    }
 
   const typeLabel: Record<string, string> = {
     rental: 'Aluguel',
@@ -257,6 +392,61 @@ export default function ContratosPage() {
                 <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
+              <div>
+              <label className="text-sm font-medium text-gray-700">Índice de reajuste</label>
+                <select value={form.indice_reajuste} onChange={e => setForm({ ...form, indice_reajuste: e.target.value })}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="IPCA">IPCA</option>
+                    <option value="IGP-M">IGP-M</option>
+                    <option value="INPC">INPC</option>
+                </select>
+                </div>
+            <div>
+            <label className="text-sm font-medium text-gray-700">Multa por rescisão (meses)</label>
+            <select value={form.multa_rescisao} onChange={e => setForm({ ...form, multa_rescisao: e.target.value })}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="1">1 mês</option>
+                <option value="2">2 meses</option>
+                <option value="3">3 meses</option>
+            </select>
+            </div>
+            <div className="col-span-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.tem_fiador}
+                onChange={e => setForm({ ...form, tem_fiador: e.target.checked })}
+                className="rounded border-gray-300" />
+                <span className="text-sm font-medium text-gray-700">Incluir fiador no contrato</span>
+            </label>
+            </div>
+
+            {form.tem_fiador && (
+            <>
+                <div>
+                <label className="text-sm font-medium text-gray-700">Nome do fiador</label>
+                <input type="text" value={form.fiador_nome} onChange={e => setForm({ ...form, fiador_nome: e.target.value })}
+                    placeholder="Ex: Carlos Souza"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                <label className="text-sm font-medium text-gray-700">CPF do fiador</label>
+                <input type="text" value={form.fiador_cpf} onChange={e => setForm({ ...form, fiador_cpf: e.target.value })}
+                    placeholder="Ex: 987.654.321-00"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                <label className="text-sm font-medium text-gray-700">RG do fiador</label>
+                <input type="text" value={form.fiador_rg} onChange={e => setForm({ ...form, fiador_rg: e.target.value })}
+                    placeholder="Ex: 12.345.678-9"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                <label className="text-sm font-medium text-gray-700">Endereço do fiador</label>
+                <input type="text" value={form.fiador_endereco} onChange={e => setForm({ ...form, fiador_endereco: e.target.value })}
+                    placeholder="Ex: Av. Brasil, 100 - Campinas/SP"
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+            </>
+            )}
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={handleSave} disabled={saving}

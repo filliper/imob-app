@@ -12,6 +12,7 @@ const links = [
   { href: '/inquilinos', icon: '👤', label: 'Inquilinos' },
   { href: '/reajuste',   icon: '📊', label: 'Reajuste' },
   { href: '/vistorias',  icon: '🗓️', label: 'Vistorias' },
+  { href: '/perfil',     icon: '⚙️', label: 'Meu perfil' },
 ]
 
 export default function Sidebar() {
