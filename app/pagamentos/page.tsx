@@ -49,23 +49,22 @@ export default function PagamentosPage() {
 
   useEffect(() => { loadAll() }, [])
 
-  async function loadAll() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    async function loadAll() {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { router.push('/login'); return }
 
-    const [{ data: p }, { data: c }] = await Promise.all([
-      supabase.from('payments')
-        .select('*, contracts(id, value, tenants(name, phone), properties(name))')
-        .order('due_date', { ascending: false }),
-      supabase.from('contracts')
-        .select('id, value, tenants(name, phone), properties(name)'),
-    ])
+        const [{ data: p }, { data: c }] = await Promise.all([
+            supabase.from('payments')
+                .select('*, contracts(id, value, tenants(name, phone), properties(name))')
+                .order('due_date', { ascending: false }),
+            supabase.from('contracts')
+                .select('id, value, tenants(name, phone), properties(name)'),
+        ])
 
-    setPayments(p ?? [])
-    setContracts(c ?? [])
-    setLoading(false)
-  }
-
+        setPayments((p ?? []) as any)
+        setContracts((c ?? []) as any)
+        setLoading(false)
+    }
   async function handleSave() {
     if (!form.contract_id || !form.due_date || !form.amount) {
       alert('Preencha todos os campos obrigatórios')
