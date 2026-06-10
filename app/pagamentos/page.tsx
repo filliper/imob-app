@@ -120,17 +120,16 @@ export default function PagamentosPage() {
     loadAll()
   }
 
-  function gerarCobrancasMes() {
-    const hoje = new Date()
-    const mes = String(hoje.getMonth() + 1).padStart(2, '0')
-    const ano = hoje.getFullYear()
-    setForm(f => ({
-      ...f,
-      due_date: `${ano}-${mes}-10`,
-    }))
-    setShowForm(true)
-  }
-
+    function gerarCobrancasMes() {
+        const hoje = new Date()
+        const mes = String(hoje.getMonth() + 1).padStart(2, '0')
+        const ano = hoje.getFullYear()
+        setForm(f => ({
+            ...f,
+            due_date: `${ano}-${mes}-10`,
+        }))
+        setShowForm(true)
+    }
   const filtered = payments.filter(p => filter === 'todos' || p.status === filter)
 
   const totalPago = payments.filter(p => p.status === 'pago').reduce((s, p) => s + p.amount, 0)
