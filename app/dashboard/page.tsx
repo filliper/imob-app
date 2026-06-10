@@ -5,95 +5,204 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/app/components/Sidebar'
 
+type Stats = {
+  properties: number
+  contracts: number
+  inspections: number
+  leads: number
+  owners: number
+  tenants: number
+  payments_pendente: number
+  payments_atrasado: number
+  payments_pago: number
+  receita_mes: number
+  receita_pendente: number
+}
+
 export default function Dashboard() {
-  const [userEmail, setUserEmail] = useState('')
-  const router = useRouter()
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [userName, setUserName] = useState('')
   const supabase = createClient()
+  const router = useRouter()
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        router.push('/login')
-      } else {
-        setUserEmail(data.user.email ?? '')
-      }
+  useEffect(() => { loadStats() }, [])
+
+  async function loadStats() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+
+    setUserName(user.email?.split('@')[0] ?? 'usuário')
+
+    const hoje = new Date()
+    const primeiroDiaMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
+
+    const [
+      { count: properties },
+      { count: contracts },
+      { count: inspections },
+      { count: leads },
+      { count: owners },
+      { count: tenants },
+      { count: pgt_pendente },
+      { count: pgt_atrasado },
+      { data: pgt_pago_data },
+      { data: receita_pendente_data },
+    ] = await Promise.all([
+      supabase.from('properties').select('*', { count: 'exact', head: true }),
+      supabase.from('contracts').select('*', { count: 'exact', head: true }),
+      supabase.from('inspections').select('*', { count: 'exact', head: true }),
+      supabase.from('leads').select('*', { count: 'exact', head: true }),
+      supabase.from('owners').select('*', { count: 'exact', head: true }),
+      supabase.from('tenants').select('*', { count: 'exact', head: true }),
+      supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pendente'),
+      supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'atrasado'),
+      supabase.from('payments').select('amount').eq('status', 'pago').gte('paid_date', primeiroDiaMes),
+      supabase.from('payments').select('amount').eq('status', 'pendente'),
+    ])
+
+    const receita_mes = (pgt_pago_data ?? []).reduce((s: number, p: any) => s + p.amount, 0)
+    const receita_pendente = (receita_pendente_data ?? []).reduce((s: number, p: any) => s + p.amount, 0)
+
+    setStats({
+      properties: properties ?? 0,
+      contracts: contracts ?? 0,
+      inspections: inspections ?? 0,
+      leads: leads ?? 0,
+      owners: owners ?? 0,
+      tenants: tenants ?? 0,
+      payments_pendente: pgt_pendente ?? 0,
+      payments_atrasado: pgt_atrasado ?? 0,
+      payments_pago: (pgt_pago_data ?? []).length,
+      receita_mes,
+      receita_pendente,
     })
-  }, [])
-
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/login')
+    setLoading(false)
   }
 
   const modules = [
-    {
-      icon: '📄',
-      title: 'Gerador de Contratos',
-      description: 'Crie contratos de aluguel, prestação de serviço e compra e venda em minutos.',
-      status: 'Em breve',
-      color: 'bg-blue-50 border-blue-200',
-      badge: 'bg-blue-100 text-blue-700',
-    },
-    {
-      icon: '📊',
-      title: 'Calculadora de Reajuste',
-      description: 'Calcule o novo valor do aluguel pelo IGPM, IPCA ou outro índice automaticamente.',
-      status: 'Em breve',
-      color: 'bg-green-50 border-green-200',
-      badge: 'bg-green-100 text-green-700',
-    },
-    {
-      icon: '🗓️',
-      title: 'Agendador de Vistorias',
-      description: 'Agende vistorias de entrada e saída com checklist digital e relatório com fotos.',
-      status: 'Em breve',
-      color: 'bg-purple-50 border-purple-200',
-      badge: 'bg-purple-100 text-purple-700',
-    },
+    { icon: '🎯', title: 'CRM / Leads', description: 'Gerencie seus leads e funil de vendas.', href: '/crm', color: 'bg-orange-50 border-orange-200' },
+    { icon: '📄', title: 'Contratos', description: 'Gere contratos em PDF com um clique.', href: '/contratos', color: 'bg-blue-50 border-blue-200' },
+    { icon: '💰', title: 'Pagamentos', description: 'Monitore aluguéis e cobranças.', href: '/pagamentos', color: 'bg-green-50 border-green-200' },
+    { icon: '🏢', title: 'Imóveis', description: 'Cadastre e gerencie seus imóveis.', href: '/imoveis', color: 'bg-purple-50 border-purple-200' },
+    { icon: '📊', title: 'Reajuste', description: 'Calcule reajustes pelo IPCA ou IGP-M.', href: '/reajuste', color: 'bg-teal-50 border-teal-200' },
+    { icon: '🗓️', title: 'Vistorias', description: 'Agende vistorias com checklist digital.', href: '/vistorias', color: 'bg-pink-50 border-pink-200' },
   ]
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <Sidebar />
+      <main className="flex-1 p-8 overflow-y-auto">
 
-      {/* Main */}
-      <main className="flex-1 p-8">
+        {/* Boas-vindas */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">Bem-vindo! 👋</h2>
-          <p className="text-gray-500 mt-1">Escolha um módulo para começar</p>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Olá, {userName}! 👋
+          </h2>
+          <p className="text-gray-500 mt-1">Aqui está o resumo do seu negócio</p>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          {[
-            { label: 'Imóveis cadastrados', value: '0' },
-            { label: 'Contratos gerados', value: '0' },
-            { label: 'Vistorias agendadas', value: '0' },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-5">
-              <p className="text-sm text-gray-500">{stat.label}</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">{stat.value}</p>
+        {loading ? (
+          <div className="grid grid-cols-4 gap-4 mb-8">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
+                <div className="h-3 bg-gray-200 rounded w-24 mb-3" />
+                <div className="h-8 bg-gray-200 rounded w-16" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            {/* Alertas */}
+            {(stats?.payments_atrasado ?? 0) > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4 mb-6 flex items-center gap-3">
+                <span className="text-xl">🔴</span>
+                <p className="text-sm font-medium text-red-700">
+                  {stats?.payments_atrasado} pagamento(s) em atraso —{' '}
+                  <a href="/pagamentos" className="underline">ver agora</a>
+                </p>
+              </div>
+            )}
+
+            {/* Financeiro */}
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Financeiro</h3>
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="bg-white border border-green-200 rounded-xl p-5">
+                <p className="text-sm text-gray-500">Recebido este mês</p>
+                <p className="text-2xl font-bold text-green-600 mt-1">
+                  {stats?.receita_mes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+              </div>
+              <div className="bg-white border border-yellow-200 rounded-xl p-5">
+                <p className="text-sm text-gray-500">A receber</p>
+                <p className="text-2xl font-bold text-yellow-600 mt-1">
+                  {stats?.receita_pendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+                {(stats?.payments_pendente ?? 0) > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">{stats?.payments_pendente} cobrança(s) pendente(s)</p>
+                )}
+              </div>
+              <div className="bg-white border border-red-200 rounded-xl p-5">
+                <p className="text-sm text-gray-500">Em atraso</p>
+                <p className="text-2xl font-bold text-red-500 mt-1">{stats?.payments_atrasado}</p>
+                <p className="text-xs text-gray-400 mt-1">pagamento(s)</p>
+              </div>
             </div>
-          ))}
-        </div>
 
-        {/* Modules */}
-        <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Módulos</h3>
+            {/* Portfólio */}
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Portfólio</h3>
+            <div className="grid grid-cols-4 gap-4 mb-8">
+              {[
+                { label: 'Imóveis', value: stats?.properties, icon: '🏢', href: '/imoveis' },
+                { label: 'Proprietários', value: stats?.owners, icon: '👔', href: '/proprietarios' },
+                { label: 'Inquilinos', value: stats?.tenants, icon: '👤', href: '/inquilinos' },
+                { label: 'Contratos', value: stats?.contracts, icon: '📄', href: '/contratos' },
+              ].map(s => (
+                <a key={s.label} href={s.href}
+                  className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-sm transition-shadow">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm text-gray-500">{s.label}</p>
+                    <span className="text-lg">{s.icon}</span>
+                  </div>
+                  <p className="text-3xl font-bold text-gray-900">{s.value}</p>
+                </a>
+              ))}
+            </div>
+
+            {/* Operacional */}
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Operacional</h3>
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              <a href="/crm" className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-sm transition-shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-500">Leads no CRM</p>
+                  <span className="text-lg">🎯</span>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{stats?.leads}</p>
+              </a>
+              <a href="/vistorias" className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-sm transition-shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-gray-500">Vistorias</p>
+                  <span className="text-lg">🗓️</span>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{stats?.inspections}</p>
+              </a>
+            </div>
+          </>
+        )}
+
+        {/* Módulos */}
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Acesso rápido</h3>
         <div className="grid grid-cols-3 gap-4">
-          {modules.map((mod) => (
-            <div
-              key={mod.title}
-              className={`rounded-xl border p-6 cursor-pointer hover:shadow-md transition-shadow ${mod.color}`}
-            >
-              <div className="text-3xl mb-3">{mod.icon}</div>
-              <h4 className="font-semibold text-gray-900 mb-2">{mod.title}</h4>
-              <p className="text-sm text-gray-600 mb-4">{mod.description}</p>
-              <span className={`text-xs font-medium px-2 py-1 rounded-full ${mod.badge}`}>
-                {mod.status}
-              </span>
-            </div>
+          {modules.map(mod => (
+            <a key={mod.title} href={mod.href}
+              className={`rounded-xl border p-5 hover:shadow-md transition-shadow cursor-pointer ${mod.color}`}>
+              <div className="text-2xl mb-2">{mod.icon}</div>
+              <h4 className="font-semibold text-gray-900 mb-1">{mod.title}</h4>
+              <p className="text-sm text-gray-500">{mod.description}</p>
+            </a>
           ))}
         </div>
+
       </main>
     </div>
   )
