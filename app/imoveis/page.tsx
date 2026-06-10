@@ -21,6 +21,7 @@ export default function ImoveisPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [owners, setOwners] = useState<Owner[]>([])
   const [form, setForm] = useState({
     name: '',
@@ -54,33 +55,27 @@ export default function ImoveisPage() {
     setLoading(false)
   }
 
-  async function handleSave() {
-    if (!form.name || !form.address || !form.rent_value) {
-      alert('Preencha todos os campos')
-      return
+    async function handleSave() {
+        if (!form.name || !form.address || !form.rent_value) { alert('Preencha todos os campos'); return }
+        setSaving(true)
+        if (editingId) {
+            await supabase.from('properties').update({
+                name: form.name, address: form.address,
+                type: form.type, rent_value: parseFloat(form.rent_value),
+            }).eq('id', editingId)
+        } else {
+            const { data: { user } } = await supabase.auth.getUser()
+            await supabase.from('properties').insert({
+                user_id: user!.id, name: form.name, address: form.address,
+                type: form.type, rent_value: parseFloat(form.rent_value),
+            })
+        }
+        setForm({ name: '', address: '', type: 'residential', rent_value: '', owner_id: '' })
+        setEditingId(null)
+        setShowForm(false)
+        loadProperties()
+        setSaving(false)
     }
-
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const { error } = await supabase.from('properties').insert({
-      user_id: user!.id,
-      name: form.name,
-      address: form.address,
-      type: form.type,
-      rent_value: parseFloat(form.rent_value),
-      owner_id: form.owner_id || null,
-    })
-
-    if (error) {
-      alert('Erro ao salvar: ' + error.message)
-    } else {
-      setForm({ name: '', address: '', type: 'residential', rent_value: '', owner_id: '' })
-      setShowForm(false)
-      loadProperties()
-    }
-    setSaving(false)
-  }
 
   async function handleDelete(id: string) {
     if (!confirm('Remover este imóvel?')) return
@@ -88,6 +83,12 @@ export default function ImoveisPage() {
     loadProperties()
   }
 
+function startEdit(p: Property) {
+  setEditingId(p.id)
+  setForm({ name: p.name, address: p.address, type: p.type, rent_value: p.rent_value.toString() })
+  setShowForm(true)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
   return (
     <div className="min-h-screen bg-gray-50 flex">
 
@@ -112,8 +113,10 @@ export default function ImoveisPage() {
         {/* Formulário */}
         {showForm && (
           <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Novo imóvel</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <h3 className="font-semibold text-gray-900 mb-4">
+              {editingId ? 'Editar imóvel' : 'Novo imóvel'}
+                </h3>
+<div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-700">Nome / Identificação</label>
                 <input
@@ -172,8 +175,18 @@ export default function ImoveisPage() {
                 disabled={saving}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
               >
-                {saving ? 'Salvando...' : 'Salvar imóvel'}
+                {saving ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Salvar imóvel'}
               </button>
+<div className="flex gap-2 border-t border-gray-100 pt-3 mt-3">
+  <button onClick={() => startEdit(p)}
+    className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50">
+    ✏️ Editar
+  </button>
+  <button onClick={() => handleDelete(p.id)}
+    className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50">
+    🗑️ Remover
+  </button>
+</div>
               <button
                 onClick={() => setShowForm(false)}
                 className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50"
