@@ -11,9 +11,12 @@ type Property = {
   address: string
   type: string
   rent_value: number
+  owner_id: string | null
+  owners?: { id: string; name: string } | null
 }
 
 type Owner = { id: string; name: string }
+
 
 
 export default function ImoveisPage() {
@@ -28,7 +31,7 @@ export default function ImoveisPage() {
     address: '',
     type: 'residential',
     rent_value: '',
-    owner_id: '' as string,
+    owner_id: '',
   })
 
   const supabase = createClient()
@@ -42,41 +45,44 @@ export default function ImoveisPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const { data } = await supabase
-      .from('properties')
-      .select('*')
-      .order('created_at', { ascending: false })
-    setProperties(data ?? [])
-    const { data: o } = await supabase
-      .from('owners')
-      .select('id, name')
-    setOwners(o ?? [])
+    const [{ data: props }, { data: ownersList }] = await Promise.all([
+      supabase.from('properties').select('*, owners(id, name)').order('created_at', { ascending: false }),
+      supabase.from('owners').select('id, name'),
+    ])
 
+    setProperties(props ?? [])
+    setOwners(ownersList ?? [])
     setLoading(false)
   }
 
-    async function handleSave() {
-        if (!form.name || !form.address || !form.rent_value) { alert('Preencha todos os campos'); return }
-        setSaving(true)
-        if (editingId) {
-            await supabase.from('properties').update({
-                name: form.name, address: form.address,
-                type: form.type, rent_value: parseFloat(form.rent_value),
-            }).eq('id', editingId)
-        } else {
-            const { data: { user } } = await supabase.auth.getUser()
-            await supabase.from('properties').insert({
-                user_id: user!.id, name: form.name, address: form.address,
-                type: form.type, rent_value: parseFloat(form.rent_value),
-            })
-        }
-        setForm({ name: '', address: '', type: 'residential', rent_value: '', owner_id: '' })
-        setEditingId(null)
-        setShowForm(false)
-        loadProperties()
-        setSaving(false)
+  async function handleSave() {
+    if (!form.name || !form.address || !form.rent_value) {
+      alert('Preencha todos os campos')
+      return
+    }
+    setSaving(true)
+
+    const payload = {
+      name: form.name,
+      address: form.address,
+      type: form.type,
+      rent_value: parseFloat(form.rent_value),
+      owner_id: form.owner_id || null,
     }
 
+    if (editingId) {
+      await supabase.from('properties').update(payload).eq('id', editingId)
+    } else {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('properties').insert({ user_id: user!.id, ...payload })
+    }
+
+    setForm({ name: '', address: '', type: 'residential', rent_value: '', owner_id: '' })
+    setEditingId(null)
+    setShowForm(false)
+    loadProperties()
+    setSaving(false)
+  }
   async function handleDelete(id: string) {
     if (!confirm('Remover este imóvel?')) return
     await supabase.from('properties').delete().eq('id', id)
@@ -85,7 +91,13 @@ export default function ImoveisPage() {
 
 function startEdit(p: Property) {
   setEditingId(p.id)
-  setForm({ name: p.name, address: p.address, type: p.type, rent_value: p.rent_value.toString(), owner_id: '' })
+  setForm({
+    name: p.name,
+    address: p.address,
+    type: p.type,
+    rent_value: p.rent_value.toString(),
+    owner_id: p.owner_id ?? '',
+  })
   setShowForm(true)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -208,6 +220,11 @@ function startEdit(p: Property) {
                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
                         {p.type === 'residential' ? 'Residencial' : 'Comercial'}
                       </span>
+                      {p.owners && (
+                        <span className="text-xs text-blue-600 font-medium">
+                          👔 {p.owners.name}
+                        </span>
+                      )}
                       <span className="text-sm font-semibold text-green-600">
                         R$ {p.rent_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </span>
