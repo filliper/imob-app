@@ -591,7 +591,25 @@ export default function ContratosPage() {
           <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
             <h3 className="font-semibold text-gray-900 mb-4">Novo contrato</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div>
+
+              {/* Tipo — sempre visível */}
+              <div className="col-span-2">
+                <label className="text-sm font-medium text-gray-700">Tipo de contrato</label>
+                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="rental">Locação Residencial</option>
+                  <option value="commercial">Locação Comercial</option>
+                  <option value="intermediacao">Intermediação Imobiliária</option>
+                  <option value="compra_venda">Compra e Venda</option>
+                  <option value="promessa_compra_venda">Promessa de Compra e Venda</option>
+                  <option value="administracao">Administração de Imóveis</option>
+                  <option value="exclusividade">Exclusividade</option>
+                  <option value="servicos">Prestação de Serviços</option>
+                </select>
+              </div>
+
+              {/* Imóvel — sempre visível */}
+              <div className="col-span-2">
                 <label className="text-sm font-medium text-gray-700">Imóvel</label>
                 <select value={form.property_id} onChange={e => setForm({ ...form, property_id: e.target.value })}
                   className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -599,24 +617,92 @@ export default function ContratosPage() {
                   {properties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Inquilino</label>
-                <select value={form.tenant_id} onChange={e => setForm({ ...form, tenant_id: e.target.value })}
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">Selecione o inquilino</option>
-                  {tenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Tipo de contrato</label>
-                <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="intermediacao">Intermediação Imobiliária</option>  
-                  <option value="rental">Aluguel</option>
-                  <option value="service">Prestação de Serviço</option>
-                  <option value="sale">Compra e Venda</option>
-                </select>
-              </div>
+
+              {/* ── CAMPOS PARA LOCAÇÃO RESIDENCIAL E COMERCIAL ── */}
+              {['rental', 'commercial'].includes(form.type) && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Inquilino</label>
+                    <select value={form.tenant_id} onChange={e => setForm({ ...form, tenant_id: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Selecione o inquilino</option>
+                      {tenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Valor mensal (R$)</label>
+                    <input type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}
+                      placeholder="Ex: 1500"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Data de início</label>
+                    <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Data de término (opcional)</label>
+                    <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Índice de reajuste</label>
+                    <select value={form.indice_reajuste} onChange={e => setForm({ ...form, indice_reajuste: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="IPCA">IPCA</option>
+                      <option value="IGP-M">IGP-M</option>
+                      <option value="INPC">INPC</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Multa por rescisão (meses)</label>
+                    <select value={form.multa_rescisao} onChange={e => setForm({ ...form, multa_rescisao: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="1">1 mês</option>
+                      <option value="2">2 meses</option>
+                      <option value="3">3 meses</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={form.tem_fiador}
+                        onChange={e => setForm({ ...form, tem_fiador: e.target.checked })}
+                        className="rounded border-gray-300" />
+                      <span className="text-sm font-medium text-gray-700">Incluir fiador no contrato</span>
+                    </label>
+                  </div>
+                  {form.tem_fiador && (
+                    <>
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Nome do fiador</label>
+                        <input type="text" value={form.fiador_nome} onChange={e => setForm({ ...form, fiador_nome: e.target.value })}
+                          placeholder="Ex: Carlos Souza"
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">CPF do fiador</label>
+                        <input type="text" value={form.fiador_cpf} onChange={e => setForm({ ...form, fiador_cpf: e.target.value })}
+                          placeholder="Ex: 987.654.321-00"
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">RG do fiador</label>
+                        <input type="text" value={form.fiador_rg} onChange={e => setForm({ ...form, fiador_rg: e.target.value })}
+                          placeholder="Ex: 12.345.678-9"
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Endereço do fiador</label>
+                        <input type="text" value={form.fiador_endereco} onChange={e => setForm({ ...form, fiador_endereco: e.target.value })}
+                          placeholder="Ex: Av. Brasil, 100 - Maceió/AL"
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* ── CAMPOS PARA INTERMEDIAÇÃO IMOBILIÁRIA ── */}
               {form.type === 'intermediacao' && (
                 <>
                   <div>
@@ -662,79 +748,94 @@ export default function ContratosPage() {
                       className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                 </>
-              )}              
-              <div>
-                <label className="text-sm font-medium text-gray-700">Valor mensal (R$)</label>
-                <input type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}
-                  placeholder="Ex: 1500"
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Data de início</label>
-                <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Data de término (opcional)</label>
-                <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
-                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-              <label className="text-sm font-medium text-gray-700">Índice de reajuste</label>
-                <select value={form.indice_reajuste} onChange={e => setForm({ ...form, indice_reajuste: e.target.value })}
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="IPCA">IPCA</option>
-                    <option value="IGP-M">IGP-M</option>
-                    <option value="INPC">INPC</option>
-                </select>
-                </div>
-            <div>
-            <label className="text-sm font-medium text-gray-700">Multa por rescisão (meses)</label>
-            <select value={form.multa_rescisao} onChange={e => setForm({ ...form, multa_rescisao: e.target.value })}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="1">1 mês</option>
-                <option value="2">2 meses</option>
-                <option value="3">3 meses</option>
-            </select>
-            </div>
-            <div className="col-span-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={form.tem_fiador}
-                onChange={e => setForm({ ...form, tem_fiador: e.target.checked })}
-                className="rounded border-gray-300" />
-                <span className="text-sm font-medium text-gray-700">Incluir fiador no contrato</span>
-            </label>
+              )}
+
+              {/* ── CAMPOS PARA COMPRA E VENDA / PROMESSA ── */}
+              {['compra_venda', 'promessa_compra_venda'].includes(form.type) && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Comprador (inquilino)</label>
+                    <select value={form.tenant_id} onChange={e => setForm({ ...form, tenant_id: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Selecione o comprador</option>
+                      {tenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Valor de venda (R$)</label>
+                    <input type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}
+                      placeholder="Ex: 350000"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Data da assinatura</label>
+                    <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  {form.type === 'promessa_compra_venda' && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Data prevista de escritura</label>
+                      <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
+                        className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── CAMPOS PARA ADMINISTRAÇÃO / EXCLUSIVIDADE ── */}
+              {['administracao', 'exclusividade'].includes(form.type) && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Data de início</label>
+                    <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Data de término</label>
+                    <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Taxa de administração (R$ ou %)</label>
+                    <input type="text" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}
+                      placeholder="Ex: 150 ou 10%"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </>
+              )}
+
+              {/* ── CAMPOS PARA PRESTAÇÃO DE SERVIÇOS ── */}
+              {form.type === 'servicos' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Prestador de serviço (inquilino)</label>
+                    <select value={form.tenant_id} onChange={e => setForm({ ...form, tenant_id: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Selecione o prestador</option>
+                      {tenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Valor do serviço (R$)</label>
+                    <input type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}
+                      placeholder="Ex: 800"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Data de início</label>
+                    <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Data de término</label>
+                    <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </>
+              )}
+
             </div>
 
-            {form.tem_fiador && (
-            <>
-                <div>
-                <label className="text-sm font-medium text-gray-700">Nome do fiador</label>
-                <input type="text" value={form.fiador_nome} onChange={e => setForm({ ...form, fiador_nome: e.target.value })}
-                    placeholder="Ex: Carlos Souza"
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                <label className="text-sm font-medium text-gray-700">CPF do fiador</label>
-                <input type="text" value={form.fiador_cpf} onChange={e => setForm({ ...form, fiador_cpf: e.target.value })}
-                    placeholder="Ex: 987.654.321-00"
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                <label className="text-sm font-medium text-gray-700">RG do fiador</label>
-                <input type="text" value={form.fiador_rg} onChange={e => setForm({ ...form, fiador_rg: e.target.value })}
-                    placeholder="Ex: 12.345.678-9"
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                <label className="text-sm font-medium text-gray-700">Endereço do fiador</label>
-                <input type="text" value={form.fiador_endereco} onChange={e => setForm({ ...form, fiador_endereco: e.target.value })}
-                    placeholder="Ex: Av. Brasil, 100 - Campinas/SP"
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-            </>
-            )}
-            </div>
             <div className="flex gap-3 mt-5">
               <button onClick={handleSave} disabled={saving}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
