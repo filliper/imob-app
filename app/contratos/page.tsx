@@ -767,6 +767,241 @@ export default function ContratosPage() {
     doc.save(`promessa-compra-venda-${buyer.name.toLowerCase().replace(/ /g, '-')}.pdf`)
   }
 
+  async function generateLocacaoComercialPDF(contract: Contract) {
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 20
+    const contentWidth = pageWidth - margin * 2
+
+    const property = contract.properties
+    const tenant = contract.tenants
+    const owner = property?.owners
+
+    const startFormatted = contract.start_date
+      ? new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
+      : '___/___/______'
+    const endFormatted = contract.end_date
+      ? new Date(contract.end_date + 'T12:00:00').toLocaleDateString('pt-BR')
+      : '___/___/______'
+    const valueFormatted = contract.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    const indice = contract.indice_reajuste ?? 'IPCA/IBGE'
+    const multa = contract.multa_rescisao ?? '3'
+    const multaExt = multa === '1' ? 'um' : multa === '2' ? 'dois' : 'três'
+
+    const addText = (text: string, y: number, indent = 0): number => {
+      if (y > 265) { doc.addPage(); y = 20 }
+      const lines = doc.splitTextToSize(text, contentWidth - indent)
+      doc.text(lines, margin + indent, y)
+      return y + lines.length * 5.5
+    }
+
+    const addSection = (title: string, y: number): number => {
+      if (y > 258) { doc.addPage(); y = 20 }
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.text(title, margin, y)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9.5)
+      return y + 7
+    }
+
+    const addItem = (text: string, y: number): number => {
+      if (y > 265) { doc.addPage(); y = 20 }
+      const lines = doc.splitTextToSize(text, contentWidth - 6)
+      doc.text(lines, margin + 6, y)
+      return y + lines.length * 5.5 + 1
+    }
+
+    let y = 20
+
+    // TÍTULO
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.text('INSTRUMENTO PARTICULAR DE CONTRATO DE LOCAÇÃO', pageWidth / 2, y, { align: 'center' })
+    y += 6
+    doc.text('PARA FINS COMERCIAIS', pageWidth / 2, y, { align: 'center' })
+    y += 10
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    y = addText('Pelo presente instrumento particular de contrato de locação de imóvel para fins comerciais e na melhor forma de Direito, as partes abaixo qualificadas:', y)
+    y += 4
+
+    // LOCADOR
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text('LOCADOR:', margin, y); y += 6
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    if (owner?.name) {
+      y = addItem(`${owner.name}${owner.cpf ? `, CPF nº ${owner.cpf}` : ''}${owner.rg ? `, RG nº ${owner.rg}` : ''}${owner.address ? `, residente na ${owner.address}` : ''}${owner.email ? `, e-mail: ${owner.email}` : ''}${owner.phone ? `, telefone: ${owner.phone}` : ''}.`, y)
+    } else {
+      y = addItem('(Proprietário não vinculado — acesse Imóveis e vincule um proprietário)', y)
+    }
+    y += 3
+
+    // LOCATÁRIO
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text('e, de outro lado,', margin, y); y += 5
+    doc.text('LOCATÁRIO:', margin, y); y += 6
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    y = addItem(`${tenant.name}${tenant.cpf ? `, CPF nº ${tenant.cpf}` : ''}${tenant.email ? `, e-mail: ${tenant.email}` : ''}${tenant.phone ? `, telefone: ${tenant.phone}` : ''}.`, y)
+    y += 3
+
+    // FIADOR
+    if (contract.fiador_nome) {
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.text('E ainda, na qualidade de FIADOR:', margin, y); y += 6
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9.5)
+      y = addItem(`${contract.fiador_nome}${contract.fiador_cpf ? `, CPF nº ${contract.fiador_cpf}` : ''}${contract.fiador_rg ? `, RG nº ${contract.fiador_rg}` : ''}${contract.fiador_endereco ? `, residente na ${contract.fiador_endereco}` : ''}.`, y)
+      y += 3
+    }
+
+    y = addText('Doravante designados, individualmente, como "Parte" e, em conjunto, "Partes", tendo entre si justo e contratado o seguinte:', y)
+    y += 6
+
+    // 1. OBJETO
+    y = addSection('1. DO OBJETO', y)
+    y = addItem(`O objeto do presente instrumento consiste na locação pelo Locatário do imóvel de propriedade do Locador, situado na ${property.address}, identificado como "${property.name}" (o "Imóvel").`, y)
+    y += 3
+
+    // 2. DESTINAÇÃO
+    y = addSection('2. DA DESTINAÇÃO DO IMÓVEL', y)
+    y = addItem('O LOCATÁRIO declara que o imóvel, ora locado, destina-se única e exclusivamente para o seu uso COMERCIAL.', y)
+    y = addItem('O uso indevido e/ou diverso do Imóvel e a inobservância das normas decorrentes dos bons costumes serão motivos para a resolução e o consequente despejo por infração contratual, independentemente da multa aqui pactuada.', y)
+    y += 3
+
+    // 3. PRAZO
+    y = addSection('3. DO PRAZO DA LOCAÇÃO', y)
+    y = addItem(`O Locador dá em locação ao Locatário o Imóvel a partir de ${startFormatted}, para terminar em ${endFormatted}.`, y)
+    y = addItem('Após o 15º (décimo quinto) mês de aluguel, fica facultado ao Locatário, mediante simples notificação por escrito, o exercício unilateral de rescindir o presente instrumento sem a aplicação de penalidade.', y)
+    y = addItem('O Locatário declara haver vistoriado o Imóvel e que o está recebendo em perfeito estado de limpeza, conservação e funcionalidade.', y)
+    y += 3
+
+    // 4. VALOR
+    y = addSection('4. DO VALOR DO ALUGUEL', y)
+    y = addItem(`O aluguel mensal livremente ajustado entre as partes, a partir de ${startFormatted}, é de ${valueFormatted}.`, y)
+    y = addItem(`O aluguel mensal será reajustado anualmente de acordo com a variação acumulada do ${indice}.`, y)
+    y = addItem('A falta de pagamento, nas épocas determinadas, por si só constituirá o Locatário em mora, independentemente de qualquer aviso ou interpelação judicial ou extrajudicial.', y)
+    y += 3
+
+    // 5. VENCIMENTO
+    y = addSection('5. DO VENCIMENTO', y)
+    y = addItem('O Locatário obriga-se a pagar o valor do aluguel mensal até o dia 10 (dez) de cada mês, em moeda corrente nacional.', y)
+    y = addItem('Após a data do vencimento, o valor será acrescido de correção pelo índice contratual, juros de mora de 1% ao mês e multa compensatória irredutível de 10%, além de honorários de advogado de 20% na hipótese de cobrança judicial.', y)
+    y += 3
+
+    // 6. BENFEITORIAS
+    y = addSection('6. DAS BENFEITORIAS', y)
+    y = addItem('O Locatário obriga-se a manter o imóvel em perfeitas condições de higiene e limpeza, restituindo-o nas mesmas condições em que o recebeu, sem direito a retenção ou indenização por benfeitorias voluptuárias.', y)
+    y = addItem('É defeso ao Locatário efetuar qualquer tipo de reforma ou benfeitoria sem que antes tenha colhido expressamente, por escrito, a anuência do Locador, sob pena de infração contratual.', y)
+    y += 3
+
+    // 7. ENCARGOS
+    y = addSection('7. DOS ENCARGOS', y)
+    y = addItem('Correrão por conta do Locatário todas as despesas de energia elétrica, água, esgoto, gás, taxa de condomínio e tributos incidentes sobre o imóvel, que deverão ser pagos nas épocas próprias diretamente às concessionárias.', y)
+    y += 3
+
+    // 8. VISTORIA
+    y = addSection('8. DA VISTORIA DO IMÓVEL', y)
+    y = addItem('O Locador fica desde já autorizado a vistoriar o imóvel sempre que julgar conveniente, nos dias úteis entre 8:00h e 18:00h, mediante aviso prévio de 24 horas.', y)
+    y += 3
+
+    // 9. MULTA
+    y = addSection('9. DA MULTA', y)
+    y = addItem(`A infração de qualquer cláusula do presente instrumento sujeitará o infrator a multa equivalente a ${multa} (${multaExt}) aluguéis mensais vigentes na data da infração.`, y)
+    y += 3
+
+    // 10. RESCISÃO
+    y = addSection('10. DA RESCISÃO DO CONTRATO', y)
+    y = addItem(`A rescisão antecipada pelo Locatário, ressalvadas as hipóteses legais, implicará multa equivalente a ${multa} (${multaExt}) aluguéis mensais.`, y)
+    y = addItem('Após o 15º mês de aluguel, fica facultado ao Locatário rescindir sem penalidade mediante notificação escrita ao Locador.', y)
+    y += 3
+
+    // 11. SUBLOCAÇÃO
+    y = addSection('11. DA SUBLOCAÇÃO', y)
+    y = addItem('É vedado ao LOCATÁRIO sublocar, transferir ou ceder o imóvel sem o consentimento prévio e por escrito do LOCADOR, sendo nulo de pleno direito qualquer ato praticado com este fim.', y)
+    y += 3
+
+    // 12. SINISTROS
+    y = addSection('12. DOS SINISTROS', y)
+    y = addItem('No caso de sinistro do prédio, parcial ou total, que impossibilite o uso do imóvel, o presente contrato estará rescindido, independentemente de aviso ou interpelação judicial ou extrajudicial.', y)
+    y += 3
+
+    // 13. GARANTIA
+    if (contract.fiador_nome) {
+      y = addSection('13. DA GARANTIA LOCATÍCIA — FIADOR', y)
+      y = addItem(`O FIADOR ${contract.fiador_nome}${contract.fiador_cpf ? `, CPF ${contract.fiador_cpf}` : ''}, como principal pagador, responde solidariamente por todos os pagamentos até a efetiva entrega das chaves e termo de vistoria do imóvel.`, y)
+      y += 3
+    }
+
+    // 14. DIREITO DE PREFERÊNCIA
+    y = addSection('14. DO DIREITO DE PREFERÊNCIA', y)
+    y = addItem('O Locatário faz jus ao direito de preferência para aquisição do Imóvel, nos moldes dos artigos 27 e seguintes da Lei nº 8.245/91, devendo o Locador notificá-lo com antecedência mínima de 30 (trinta) dias.', y)
+    y += 3
+
+    // 15. LGPD
+    y = addSection('15. DA OBSERVÂNCIA À LGPD', y)
+    y = addItem('O LOCATÁRIO declara expresso consentimento que o LOCADOR irá coletar, tratar e compartilhar os dados necessários ao cumprimento do contrato, nos termos da Lei nº 13.709/2018 (LGPD).', y)
+    y += 3
+
+    // 16. FORO
+    y = addSection('16. DO FORO', y)
+    y = addItem('Para eventuais demandas que emanarem deste instrumento, elegem as partes o foro da situação do Imóvel, com expressa renúncia a qualquer outro por mais privilegiado que seja.', y)
+    y += 8
+
+    // ASSINATURAS
+    if (y > 220) { doc.addPage(); y = 20 }
+    y = addText(`Estando justas e contratadas, as partes assinam em 02 (duas) vias de igual teor e forma, juntamente com as testemunhas abaixo.`, y)
+    y += 4
+    y = addText(`[cidade/estado], ${new Date().toLocaleDateString('pt-BR')}.`, y)
+    y += 12
+
+    doc.line(margin, y, margin + 70, y)
+    doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+    y += 5
+    doc.setFontSize(9)
+    doc.text(owner?.name ?? 'LOCADOR', margin + 35, y, { align: 'center' })
+    doc.text(tenant.name, pageWidth / 2 + 45, y, { align: 'center' })
+    y += 4
+    doc.setTextColor(120)
+    doc.text('LOCADOR', margin + 35, y, { align: 'center' })
+    doc.text('LOCATÁRIO', pageWidth / 2 + 45, y, { align: 'center' })
+    doc.setTextColor(0)
+
+    if (contract.fiador_nome) {
+      y += 14
+      if (y > 260) { doc.addPage(); y = 20 }
+      doc.line(pageWidth / 2 - 35, y, pageWidth / 2 + 35, y)
+      y += 5
+      doc.text(contract.fiador_nome, pageWidth / 2, y, { align: 'center' })
+      y += 4
+      doc.setTextColor(120)
+      doc.text('FIADOR', pageWidth / 2, y, { align: 'center' })
+      doc.setTextColor(0)
+    }
+
+    y += 14
+    if (y > 255) { doc.addPage(); y = 20 }
+    doc.text('Testemunhas:', margin, y); y += 8
+    doc.line(margin, y, margin + 70, y)
+    doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+    y += 5
+    doc.setTextColor(120)
+    doc.text('1. Nome: _______________  RG: _______________  CPF: _______________', margin, y)
+    doc.text('2. Nome: _______________  RG: _______________  CPF: _______________', pageWidth / 2 + 10, y)
+    doc.setTextColor(0)
+
+    doc.setFontSize(7)
+    doc.setTextColor(150)
+    doc.text('Gerado por ImobApp · imobapp.com.br · Lei 8.245/1991', pageWidth / 2, 290, { align: 'center' })
+
+    doc.save(`contrato-locacao-comercial-${tenant.name.toLowerCase().replace(/ /g, '-')}.pdf`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
         <Sidebar />
@@ -1116,6 +1351,7 @@ export default function ContratosPage() {
                   onClick={() => {
                     if (c.type === 'intermediacao') generateIntermediacaoPDF(c)
                     else if (c.type === 'promessa_compra_venda') generatePromessaPDF(c)
+                    else if (c.type === 'commercial') generateLocacaoComercialPDF(c)
                     else generatePDF(c)
                   }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-2"
