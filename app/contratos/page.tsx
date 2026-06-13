@@ -54,6 +54,9 @@ type Contract = {
   banco_agencia: string | null
   banco_conta: string | null
   banco_titular: string | null
+  sinal_valor: any
+  parcelas_valor: any
+  parcelas_quantidade: any
 }
 
 export default function ContratosPage() {
@@ -83,6 +86,9 @@ export default function ContratosPage() {
     banco_agencia: '',
     banco_conta: '',
     banco_titular: '',
+    sinal_valor: '',
+    parcelas_quantidade: '',
+    parcelas_valor: '',
   })
 
   const supabase = createClient()
@@ -159,6 +165,9 @@ export default function ContratosPage() {
         banco_agencia: '',
         banco_conta: '',
         banco_titular: '',
+        parcelas_quantidade: '',
+        parcelas_valor: '',
+        sinal_valor: '',        
       })
       setShowForm(false)
       loadAll()
@@ -572,6 +581,192 @@ export default function ContratosPage() {
     sale: 'Compra e Venda',
   }
 
+  async function generatePromessaPDF(contract: Contract) {
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 20
+    const contentWidth = pageWidth - margin * 2
+
+    const property = contract.properties
+    const owner = property?.owners
+    const buyer = contract.tenants
+
+    const totalFormatted = contract.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    const sinalFormatted = contract.sinal_valor
+      ? contract.sinal_valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      : 'a definir'
+    const parcelaFormatted = contract.parcelas_valor
+      ? contract.parcelas_valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      : 'a definir'
+    const dataAssinatura = contract.start_date
+      ? new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
+      : '___/___/______'
+    const dataEscritura = contract.end_date
+      ? new Date(contract.end_date + 'T12:00:00').toLocaleDateString('pt-BR')
+      : '___/___/______'
+
+    const addText = (text: string, y: number, indent = 0): number => {
+      if (y > 265) { doc.addPage(); y = 20 }
+      const lines = doc.splitTextToSize(text, contentWidth - indent)
+      doc.text(lines, margin + indent, y)
+      return y + lines.length * 5.5
+    }
+
+    const addSection = (title: string, y: number): number => {
+      if (y > 258) { doc.addPage(); y = 20 }
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.text(title, margin, y)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9.5)
+      return y + 7
+    }
+
+    const addItem = (text: string, y: number): number => {
+      if (y > 265) { doc.addPage(); y = 20 }
+      const lines = doc.splitTextToSize(text, contentWidth - 6)
+      doc.text(lines, margin + 6, y)
+      return y + lines.length * 5.5 + 1
+    }
+
+    let y = 20
+
+    // TÍTULO
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.text('INSTRUMENTO PARTICULAR DE PROMESSA DE VENDA E COMPRA DE IMÓVEL', pageWidth / 2, y, { align: 'center' })
+    y += 10
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    y = addText('Pelo presente instrumento particular e na melhor forma de Direito, as partes abaixo qualificadas:', y)
+    y += 4
+
+    // VENDEDORA
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text('PROMITENTE VENDEDORA:', margin, y); y += 6
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    if (owner?.name) {
+      y = addItem(`${owner.name}${owner.cpf ? `, CPF nº ${owner.cpf}` : ''}${owner.rg ? `, RG nº ${owner.rg}` : ''}${owner.address ? `, residente na ${owner.address}` : ''}${owner.email ? `, e-mail: ${owner.email}` : ''}${owner.phone ? `, telefone: ${owner.phone}` : ''}, doravante denominada simplesmente como VENDEDORA.`, y)
+    } else {
+      y = addItem('(Proprietário não vinculado — vincule em Imóveis)', y)
+    }
+    y += 3
+
+    // COMPRADORA
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text('PROMITENTE COMPRADORA:', margin, y); y += 6
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    y = addItem(`${buyer.name}${buyer.cpf ? `, CPF nº ${buyer.cpf}` : ''}${buyer.email ? `, e-mail: ${buyer.email}` : ''}${buyer.phone ? `, telefone: ${buyer.phone}` : ''}, doravante denominada simplesmente como COMPRADORA.`, y)
+    y += 4
+
+    y = addText('As partes acima identificadas, tendo entre si justo e contratado o seguinte:', y)
+    y += 6
+
+    // OBJETO
+    y = addSection('1. OBJETO', y)
+    y = addItem(`O objeto do presente instrumento consiste no compromisso para venda e compra do imóvel situado na ${property.address} (o "Imóvel"), no qual a VENDEDORA, sendo legítima proprietária, promete vender à COMPRADORA, que promete comprar, pagando o preço aqui convencionado.`, y)
+    y += 3
+
+    // DO IMÓVEL
+    y = addSection('2. DO IMÓVEL', y)
+    y = addItem(`O Imóvel identificado como "${property.name}", localizado na ${property.address}, objeto do presente instrumento.`, y)
+    y += 3
+
+    // PREÇO
+    y = addSection('3. DO PREÇO', y)
+    y = addItem(`O preço total, certo e ajustado é de ${totalFormatted}, da seguinte forma:`, y)
+    y = addItem(`a) Sinal: ${sinalFormatted}, neste ato, como sinal e princípio de pagamento, em moeda corrente, dando a VENDEDORA plena, geral e irrevogável quitação.`, y)
+    if (contract.parcelas_quantidade && contract.parcelas_valor) {
+      y = addItem(`b) Parcelamento: ${parcelaFormatted} em ${contract.parcelas_quantidade} parcelas mensais e consecutivas.`, y)
+    }
+    if (contract.banco_nome) {
+      y = addItem(`Os pagamentos deverão ser realizados mediante transferência bancária para ${contract.banco_nome}${contract.banco_agencia ? `, Agência: ${contract.banco_agencia}` : ''}${contract.banco_conta ? `, Conta: ${contract.banco_conta}` : ''}${contract.banco_titular ? `, Titular: ${contract.banco_titular}` : ''}.`, y)
+    }
+    y += 3
+
+    // POSSE
+    y = addSection('4. DA TRANSFERÊNCIA DA POSSE', y)
+    y = addItem(`A posse direta do imóvel será transmitida à COMPRADORA na data prevista para lavratura da Escritura Pública de Venda e Compra, prevista para ${dataEscritura}.`, y)
+    y = addItem('Os COMPRADORES, a partir da transmissão da posse, obrigam-se a providenciar, no prazo de 30 (trinta) dias, a mudança da titularidade junto às autoridades competentes, referente a tributos, tarifas e encargos que incidam sobre o imóvel.', y)
+    y += 3
+
+    // TRIBUTOS
+    y = addSection('5. DOS TRIBUTOS E DESPESAS', y)
+    y = addItem('Todos os impostos, taxas e contribuições que incidam sobre o imóvel são de inteira responsabilidade da VENDEDORA até a imissão da COMPRADORA na posse. As despesas de ITBI e emolumentos cartorários serão de responsabilidade da COMPRADORA.', y)
+    y += 3
+
+    // IRREVOGABILIDADE
+    y = addSection('6. DA IRREVOGABILIDADE E IRRETRATIBILIDADE', y)
+    y = addItem('O presente instrumento é celebrado em caráter IRREVOGÁVEL e IRRETRATÁVEL, renunciando as partes à faculdade de arrependimento concedida pelo artigo 420 do Código Civil Brasileiro, sendo extensivo e obrigatório aos seus herdeiros e sucessores.', y)
+    y += 3
+
+    // DOCUMENTAÇÃO
+    y = addSection('7. DA DOCUMENTAÇÃO', y)
+    y = addItem('A VENDEDORA se obriga, às suas expensas, a entregar à COMPRADORA os documentos relativos à situação do imóvel e à sua pessoa em até 15 (quinze) dias úteis a contar da assinatura deste instrumento, incluindo certidões de propriedade, negativas de tributos e declaração de inexistência de débitos condominiais.', y)
+    y += 3
+
+    // INADIMPLÊNCIA
+    y = addSection('8. DA INADIMPLÊNCIA', y)
+    y = addItem('O não pagamento de qualquer parcela sujeitará a COMPRADORA a multa de 10% (dez por cento) sobre o valor inadimplido, acrescida de juros de 1% ao mês, pro rata die. O atraso superior a 30 dias configurará hipótese de rescisão contratual.', y)
+    y += 3
+
+    // RESCISÃO
+    y = addSection('9. DA RESCISÃO', y)
+    y = addItem('Verificada a rescisão por inadimplência da COMPRADORA, caberá multa de 10% sobre o valor do contrato atualizado pelo IPCA/IBGE, a título de perdas e danos pré-fixados.', y)
+    y = addItem('Verificada a rescisão por negativa da VENDEDORA, esta devolverá os valores pagos com juros de 1% ao mês, correção pelo IPCA/IBGE e multa de 10% sobre o valor do contrato.', y)
+    y += 3
+
+    // LGPD
+    y = addSection('10. DA PROTEÇÃO DE DADOS PESSOAIS (LGPD)', y)
+    y = addItem('As Partes se comprometem a manter sigilo absoluto sobre todas as informações trocadas e a tratar os dados pessoais em conformidade com a Lei nº 13.709/2018 (LGPD), limitando o uso das informações estritamente às finalidades deste contrato.', y)
+    y += 3
+
+    // FORO
+    y = addSection('11. DO FORO', y)
+    y = addItem('Fica eleito o foro da situação do Imóvel para dirimir quaisquer dúvidas decorrentes deste compromisso, com expressa renúncia de qualquer outro por mais privilegiado que seja.', y)
+    y += 8
+
+    // ASSINATURAS
+    if (y > 230) { doc.addPage(); y = 20 }
+    y = addText(`E, assim, por estarem justas e contratadas, as partes firmam o presente instrumento em 02 (duas) vias de igual teor, na presença de 02 (duas) testemunhas.`, y)
+    y += 4
+    y = addText(`[cidade/estado], ${dataAssinatura}.`, y)
+    y += 12
+
+    doc.line(margin, y, margin + 70, y)
+    doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+    y += 5
+    doc.setFontSize(9)
+    doc.text(buyer.name, margin + 35, y, { align: 'center' })
+    doc.text(owner?.name ?? 'VENDEDORA', pageWidth / 2 + 45, y, { align: 'center' })
+    y += 4
+    doc.setTextColor(120)
+    doc.text('COMPRADORA', margin + 35, y, { align: 'center' })
+    doc.text('VENDEDORA', pageWidth / 2 + 45, y, { align: 'center' })
+    doc.setTextColor(0)
+    y += 12
+
+    if (y > 250) { doc.addPage(); y = 20 }
+    doc.text('Testemunhas:', margin, y); y += 8
+    doc.line(margin, y, margin + 70, y)
+    doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+    y += 5
+    doc.setTextColor(120)
+    doc.text('1. Nome: _______________  RG: _______________  CPF: _______________', margin, y)
+    doc.text('2. Nome: _______________  RG: _______________  CPF: _______________', pageWidth / 2 + 10, y)
+    doc.setTextColor(0)
+
+    doc.setFontSize(7)
+    doc.setTextColor(150)
+    doc.text('Gerado por ImobApp · imobapp.com.br', pageWidth / 2, 290, { align: 'center' })
+
+    doc.save(`promessa-compra-venda-${buyer.name.toLowerCase().replace(/ /g, '-')}.pdf`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
         <Sidebar />
@@ -754,7 +949,7 @@ export default function ContratosPage() {
               {['compra_venda', 'promessa_compra_venda'].includes(form.type) && (
                 <>
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Comprador (inquilino)</label>
+                    <label className="text-sm font-medium text-gray-700">Comprador</label>
                     <select value={form.tenant_id} onChange={e => setForm({ ...form, tenant_id: e.target.value })}
                       className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
                       <option value="">Selecione o comprador</option>
@@ -762,9 +957,27 @@ export default function ContratosPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Valor de venda (R$)</label>
+                    <label className="text-sm font-medium text-gray-700">Valor total de venda (R$)</label>
                     <input type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}
                       placeholder="Ex: 350000"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Valor do sinal (R$)</label>
+                    <input type="number" value={form.sinal_valor} onChange={e => setForm({ ...form, sinal_valor: e.target.value })}
+                      placeholder="Ex: 35000"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Quantidade de parcelas</label>
+                    <input type="number" value={form.parcelas_quantidade} onChange={e => setForm({ ...form, parcelas_quantidade: e.target.value })}
+                      placeholder="Ex: 12"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Valor de cada parcela (R$)</label>
+                    <input type="number" value={form.parcelas_valor} onChange={e => setForm({ ...form, parcelas_valor: e.target.value })}
+                      placeholder="Ex: 26250"
                       className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
@@ -779,9 +992,32 @@ export default function ContratosPage() {
                         className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                   )}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Banco para pagamento</label>
+                    <input type="text" value={form.banco_nome} onChange={e => setForm({ ...form, banco_nome: e.target.value })}
+                      placeholder="Ex: Bradesco"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Agência</label>
+                    <input type="text" value={form.banco_agencia} onChange={e => setForm({ ...form, banco_agencia: e.target.value })}
+                      placeholder="Ex: 0001"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Conta corrente</label>
+                    <input type="text" value={form.banco_conta} onChange={e => setForm({ ...form, banco_conta: e.target.value })}
+                      placeholder="Ex: 12345-6"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Titular da conta</label>
+                    <input type="text" value={form.banco_titular} onChange={e => setForm({ ...form, banco_titular: e.target.value })}
+                      placeholder="Ex: Roberto Alves"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
                 </>
               )}
-
               {/* ── CAMPOS PARA ADMINISTRAÇÃO / EXCLUSIVIDADE ── */}
               {['administracao', 'exclusividade'].includes(form.type) && (
                 <>
@@ -877,10 +1113,11 @@ export default function ContratosPage() {
                   </p>
                 </div>
                 <button
-                  onClick={() => c.type === 'intermediacao'
-                    ? generateIntermediacaoPDF(c)
-                    : generatePDF(c)
-                  }
+                  onClick={() => {
+                    if (c.type === 'intermediacao') generateIntermediacaoPDF(c)
+                    else if (c.type === 'promessa_compra_venda') generatePromessaPDF(c)
+                    else generatePDF(c)
+                  }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-2"
                 >
                   ⬇ Baixar PDF
