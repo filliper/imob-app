@@ -1002,6 +1002,203 @@ export default function ContratosPage() {
     doc.save(`contrato-locacao-comercial-${tenant.name.toLowerCase().replace(/ /g, '-')}.pdf`)
   }
 
+  async function generateAdministracaoPDF(contract: Contract) {
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 20
+    const contentWidth = pageWidth - margin * 2
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: perfil } = await supabase.from('user_profiles').select('*').eq('id', user!.id).single()
+
+    const property = contract.properties
+    const owner = property?.owners
+    const contratada = perfil
+
+    const startFormatted = contract.start_date
+      ? new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
+      : '___/___/______'
+    const endFormatted = contract.end_date
+      ? new Date(contract.end_date + 'T12:00:00').toLocaleDateString('pt-BR')
+      : '___/___/______'
+    const taxaAdmin = contract.value
+      ? contract.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      : 'a definir'
+    const percentual = contract.comissao_percentual ? `${contract.comissao_percentual}%` : 'a definir'
+    const comissaoVenda = contract.comissao_valor ? `${contract.comissao_valor}%` : 'a definir'
+    const multa = contract.multa_rescisao ?? '3'
+    const multaExt = multa === '1' ? 'um' : multa === '2' ? 'dois' : 'três'
+
+    const addText = (text: string, y: number, indent = 0): number => {
+      if (y > 265) { doc.addPage(); y = 20 }
+      const lines = doc.splitTextToSize(text, contentWidth - indent)
+      doc.text(lines, margin + indent, y)
+      return y + lines.length * 5.5
+    }
+
+    const addSection = (title: string, y: number): number => {
+      if (y > 258) { doc.addPage(); y = 20 }
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.text(title, margin, y)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9.5)
+      return y + 7
+    }
+
+    const addItem = (text: string, y: number): number => {
+      if (y > 265) { doc.addPage(); y = 20 }
+      const lines = doc.splitTextToSize(text, contentWidth - 6)
+      doc.text(lines, margin + 6, y)
+      return y + lines.length * 5.5 + 1
+    }
+
+    let y = 20
+
+    // TÍTULO
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.text('INSTRUMENTO PARTICULAR DE CONTRATO DE', pageWidth / 2, y, { align: 'center' })
+    y += 6
+    doc.text('ADMINISTRAÇÃO DE IMÓVEIS', pageWidth / 2, y, { align: 'center' })
+    y += 10
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    y = addText('Pelo presente instrumento particular de contrato de administração de imóveis e na melhor forma de Direito, as partes abaixo qualificadas:', y)
+    y += 4
+
+    // CONTRATANTE (proprietário)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text('CONTRATANTE:', margin, y); y += 6
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    if (owner?.name) {
+      y = addItem(`${owner.name}${owner.cpf ? `, CPF nº ${owner.cpf}` : ''}${owner.rg ? `, RG nº ${owner.rg}` : ''}${owner.address ? `, residente na ${owner.address}` : ''}${owner.email ? `, e-mail: ${owner.email}` : ''}${owner.phone ? `, telefone: ${owner.phone}` : ''}.`, y)
+    } else {
+      y = addItem('(Proprietário não vinculado ao imóvel — acesse Imóveis e vincule um proprietário)', y)
+    }
+    y += 3
+
+    // CONTRATADA (corretor/administradora)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text('e, de outro lado,', margin, y); y += 5
+    doc.text('CONTRATADA (ADMINISTRADORA):', margin, y); y += 6
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    if (contratada?.full_name) {
+      y = addItem(`${contratada.full_name}${contratada.cpf ? `, CPF nº ${contratada.cpf}` : ''}${contratada.rg ? `, RG nº ${contratada.rg}` : ''}${contratada.address ? `, residente na ${contratada.address}` : ''}${contratada.phone ? `, telefone: ${contratada.phone}` : ''}.`, y)
+    } else {
+      y = addItem('(Preencha seus dados em "Meu Perfil" para aparecerem aqui)', y)
+    }
+    y += 4
+
+    y = addText('Doravante designados, individualmente, como "Parte" e, em conjunto, "Partes", tendo entre si justo e contratado o seguinte:', y)
+    y += 6
+
+    // 1. OBJETO
+    y = addSection('1. DO OBJETO', y)
+    y = addItem(`O presente contrato tem como objeto a prestação, pela CONTRATADA, dos serviços de administração do imóvel denominado "${property.name}", situado na ${property.address}.`, y)
+    y += 3
+
+    // 2. PRAZO
+    y = addSection('2. DO PRAZO', y)
+    y = addItem(`O contrato terá duração de ${startFormatted} a ${endFormatted}, contados a partir da assinatura deste instrumento, podendo ser renovado mediante acordo entre as partes.`, y)
+    y += 3
+
+    // 3. PROCURAÇÃO
+    y = addSection('3. DA PROCURAÇÃO', y)
+    y = addItem('Por meio deste contrato, o CONTRATANTE autoriza a CONTRATADA a promover a administração do aluguel do imóvel supramencionado, outorgando-lhe todos os poderes necessários para o desenvolvimento desta atividade, incluindo o poder para promover a divulgação do imóvel, receber, negociar e dar quitação dos aluguéis pagos pelo Locatário e seus Fiadores.', y)
+    y += 3
+
+    // 4. OBRIGAÇÕES DA CONTRATADA
+    y = addSection('4. DAS OBRIGAÇÕES GERAIS DA CONTRATADA', y)
+    y = addItem('4.1 Compete à CONTRATADA a análise e aprovação cadastral dos Locatários e Fiadores, seleção das garantias oferecidas e a condução dos assuntos relacionados com a locação.', y)
+    y = addItem('4.2 A CONTRATADA poderá afixar cartazes e placas no imóvel, promover anúncios nos jornais, na internet e em outros meios de divulgação.', y)
+    y = addItem('4.3 A CONTRATADA, recebendo o pagamento realizado pelo Locatário, repassará ao CONTRATANTE o valor do aluguel e demais encargos através de depósito bancário em conta por ele indicada.', y)
+    y = addItem('4.4 No caso de inadimplência, a CONTRATADA promoverá em nome do CONTRATANTE todas as medidas judiciais ou extrajudiciais cabíveis.', y)
+    y = addItem('4.5 A CONTRATADA realizará vistorias periódicas no imóvel e informará o CONTRATANTE sobre sua situação.', y)
+    y = addItem('4.6 A CONTRATADA fará prestação de contas mensal de toda movimentação referente à administração do imóvel.', y)
+    y += 3
+
+    // 5. OBRIGAÇÕES DO CONTRATANTE
+    y = addSection('5. DAS OBRIGAÇÕES GERAIS DO CONTRATANTE', y)
+    y = addItem('5.1 É obrigação do CONTRATANTE apresentar todos os impostos, taxas e quaisquer encargos devidamente quitados do período anterior a esta administração.', y)
+    y = addItem('5.2 É obrigação do CONTRATANTE entregar ao Locatário o imóvel em perfeito estado de funcionamento da parte elétrica, hidráulica e demais itens que façam parte do imóvel.', y)
+    y = addItem('5.3 No período em que o imóvel estiver desocupado, o CONTRATANTE se responsabilizará pelo pagamento dos encargos, tais como: Condomínio, Água, Gás, Luz e IPTU.', y)
+    y += 3
+
+    // 6. REMUNERAÇÃO
+    y = addSection('6. DA REMUNERAÇÃO', y)
+    y = addItem(`6.1 Em virtude da prestação de seus serviços de administração, a CONTRATADA receberá a quantia de ${taxaAdmin} por mês.`, y)
+    y = addItem(`6.2 Por cada imóvel alugado, a CONTRATADA receberá também uma porcentagem de ${percentual} do valor do aluguel.`, y)
+    y = addItem(`6.3 Em caso de venda do imóvel intermediada pela CONTRATADA, será devida comissão de ${comissaoVenda} sobre o valor total da transação.`, y)
+    y += 3
+
+    // 7. ASSISTÊNCIA JURÍDICA
+    y = addSection('7. DA ASSISTÊNCIA JURÍDICA', y)
+    y = addItem('A CONTRATADA obriga-se a patrocinar, sem qualquer ônus para o CONTRATANTE, as seguintes ações: cobrança judicial de aluguéis, ações de despejo por infração legal ou contratual, ações revisionais do valor do aluguel e ações indenizatórias por avarias causadas pelo Locatário.', y)
+    y += 3
+
+    // 8. RESCISÃO
+    y = addSection('8. DA RESCISÃO CONTRATUAL', y)
+    y = addItem('O presente contrato poderá ser rescindido unilateralmente por qualquer das partes, mediante notificação escrita com antecedência mínima de 30 (trinta) dias, sujeitando-se a parte rescidente ao pagamento da multa contratual prevista na cláusula seguinte.', y)
+    y = addItem('Em caso de venda do imóvel a terceiros que não tenham interesse em dar continuidade ao presente contrato, o CONTRATANTE pagará à CONTRATADA multa correspondente a 3 (três) meses do valor da taxa de administração vigente.', y)
+    y += 3
+
+    // 9. MULTA
+    y = addSection('9. DA MULTA', y)
+    y = addItem(`A infração de qualquer cláusula do presente instrumento sujeitará o infrator ao pagamento de multa contratual equivalente a ${multa} (${multaExt}) mês(es) da taxa de administração vigente na data da infração.`, y)
+    y += 3
+
+    // 10. LGPD
+    y = addSection('10. DA OBSERVÂNCIA À LGPD', y)
+    y = addItem('O CONTRATANTE declara expresso consentimento que a CONTRATADA irá coletar, tratar e compartilhar os dados necessários ao cumprimento do contrato, nos termos da Lei nº 13.709/2018 (LGPD). As Partes comprometem-se a manter sigilo absoluto sobre todas as informações trocadas e a utilizá-las exclusivamente para as finalidades deste contrato.', y)
+    y += 3
+
+    // 11. FORO
+    y = addSection('11. DO FORO', y)
+    y = addItem('Para eventuais demandas que emanarem deste instrumento, elegem as partes o foro da comarca da situação do imóvel, com expressa renúncia a qualquer outro por mais privilegiado que seja.', y)
+    y += 8
+
+    // ASSINATURAS
+    if (y > 220) { doc.addPage(); y = 20 }
+    y = addText('Estando justas e contratadas, as partes assinam em 02 (duas) vias de igual teor e forma, juntamente com as testemunhas abaixo.', y)
+    y += 4
+    y = addText(`[cidade/estado], ${new Date().toLocaleDateString('pt-BR')}.`, y)
+    y += 12
+
+    doc.line(margin, y, margin + 70, y)
+    doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+    y += 5
+    doc.setFontSize(9)
+    doc.text(owner?.name ?? 'CONTRATANTE', margin + 35, y, { align: 'center' })
+    doc.text(contratada?.full_name ?? 'CONTRATADA', pageWidth / 2 + 45, y, { align: 'center' })
+    y += 4
+    doc.setTextColor(120)
+    doc.text('CONTRATANTE (PROPRIETÁRIO)', margin + 35, y, { align: 'center' })
+    doc.text('CONTRATADA (ADMINISTRADORA)', pageWidth / 2 + 45, y, { align: 'center' })
+    doc.setTextColor(0)
+    y += 14
+
+    if (y > 255) { doc.addPage(); y = 20 }
+    doc.text('Testemunhas:', margin, y); y += 8
+    doc.line(margin, y, margin + 70, y)
+    doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+    y += 5
+    doc.setTextColor(120)
+    doc.text('1. Nome: _______________  RG: _______________  CPF: _______________', margin, y)
+    doc.text('2. Nome: _______________  RG: _______________  CPF: _______________', pageWidth / 2 + 10, y)
+    doc.setTextColor(0)
+
+    doc.setFontSize(7)
+    doc.setTextColor(150)
+    doc.text('Gerado por ImobApp · imobapp.com.br · Lei 8.245/1991', pageWidth / 2, 290, { align: 'center' })
+
+    doc.save(`contrato-administracao-${(owner?.name ?? 'imovel').toLowerCase().replace(/ /g, '-')}.pdf`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
         <Sidebar />
@@ -1254,7 +1451,7 @@ export default function ContratosPage() {
                 </>
               )}
               {/* ── CAMPOS PARA ADMINISTRAÇÃO / EXCLUSIVIDADE ── */}
-              {['administracao', 'exclusividade'].includes(form.type) && (
+              {form.type === 'administracao' && (
                 <>
                   <div>
                     <label className="text-sm font-medium text-gray-700">Data de início</label>
@@ -1267,10 +1464,31 @@ export default function ContratosPage() {
                       className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Taxa de administração (R$ ou %)</label>
-                    <input type="text" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}
-                      placeholder="Ex: 150 ou 10%"
+                    <label className="text-sm font-medium text-gray-700">Taxa de administração (R$)</label>
+                    <input type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}
+                      placeholder="Ex: 150"
                       className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Percentual sobre aluguel (%)</label>
+                    <input type="number" value={form.comissao_percentual} onChange={e => setForm({ ...form, comissao_percentual: e.target.value })}
+                      placeholder="Ex: 10"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Comissão por venda (%)</label>
+                    <input type="number" value={form.comissao_valor} onChange={e => setForm({ ...form, comissao_valor: e.target.value })}
+                      placeholder="Ex: 6"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Multa por rescisão (meses)</label>
+                    <select value={form.multa_rescisao} onChange={e => setForm({ ...form, multa_rescisao: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="1">1 mês</option>
+                      <option value="2">2 meses</option>
+                      <option value="3">3 meses</option>
+                    </select>
                   </div>
                 </>
               )}
@@ -1352,6 +1570,7 @@ export default function ContratosPage() {
                     if (c.type === 'intermediacao') generateIntermediacaoPDF(c)
                     else if (c.type === 'promessa_compra_venda') generatePromessaPDF(c)
                     else if (c.type === 'commercial') generateLocacaoComercialPDF(c)
+                    else if (c.type === 'administracao') generateAdministracaoPDF(c)
                     else generatePDF(c)
                   }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-2"
