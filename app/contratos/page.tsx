@@ -116,65 +116,96 @@ export default function ContratosPage() {
   }
 
   async function handleSave() {
-    if (!form.property_id || !form.tenant_id || !form.start_date || !form.value) {
-      alert('Preencha todos os campos obrigatórios')
+    // Validação por tipo
+    if (!form.property_id) {
+      alert('Selecione um imóvel')
       return
     }
+
+    if (['rental', 'commercial'].includes(form.type)) {
+      if (!form.tenant_id || !form.start_date || !form.value) {
+        alert('Preencha todos os campos obrigatórios')
+        return
+      }
+    }
+
+    if (form.type === 'intermediacao') {
+      if (!form.comissao_valor && !form.comissao_percentual) {
+        alert('Informe o valor ou percentual da comissão')
+        return
+      }
+    }
+
+    if (['compra_venda', 'promessa_compra_venda'].includes(form.type)) {
+      if (!form.tenant_id || !form.value || !form.start_date) {
+        alert('Preencha todos os campos obrigatórios')
+        return
+      }
+    }
+
+    if (form.type === 'administracao') {
+      if (!form.start_date) {
+        alert('Informe a data de início')
+        return
+      }
+    }
+
+    if (form.type === 'exclusividade') {
+      if (!form.start_date) {
+        alert('Informe a data de início')
+        return
+      }
+    }
+
+    if (form.type === 'servicos') {
+      if (!form.tenant_id || !form.value || !form.start_date) {
+        alert('Preencha todos os campos obrigatórios')
+        return
+      }
+    }
+
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
+
     const { error } = await supabase.from('contracts').insert({
-        user_id: user!.id,
-        property_id: form.property_id,
-        tenant_id: form.tenant_id,
-        type: form.type,
-        start_date: form.start_date,
-        end_date: form.end_date || null,
-        value: parseFloat(form.value),
-        indice_reajuste: form.indice_reajuste,
-        multa_rescisao: form.multa_rescisao,
-        fiador_nome: form.tem_fiador ? form.fiador_nome : null,
-        fiador_cpf: form.tem_fiador ? form.fiador_cpf : null,
-        fiador_rg: form.tem_fiador ? form.fiador_rg : null,
-        fiador_endereco: form.tem_fiador ? form.fiador_endereco : null,
-        comissao_valor: form.comissao_valor ? parseFloat(form.comissao_valor) : null,
-        comissao_percentual: form.comissao_percentual ? parseFloat(form.comissao_percentual) : null,
-        banco_nome: form.banco_nome || null,
-        banco_agencia: form.banco_agencia || null,
-        banco_conta: form.banco_conta || null,
-        banco_titular: form.banco_titular || null,        
+      user_id: user!.id,
+      property_id: form.property_id,
+      tenant_id: form.tenant_id || null,
+      type: form.type,
+      start_date: form.start_date || null,
+      end_date: form.end_date || null,
+      value: form.value ? parseFloat(form.value) : 0,
+      indice_reajuste: form.indice_reajuste,
+      multa_rescisao: form.multa_rescisao,
+      fiador_nome: form.tem_fiador ? form.fiador_nome : null,
+      fiador_cpf: form.tem_fiador ? form.fiador_cpf : null,
+      fiador_rg: form.tem_fiador ? form.fiador_rg : null,
+      fiador_endereco: form.tem_fiador ? form.fiador_endereco : null,
+      comissao_valor: form.comissao_valor ? parseFloat(form.comissao_valor) : null,
+      comissao_percentual: form.comissao_percentual ? parseFloat(form.comissao_percentual) : null,
+      banco_nome: form.banco_nome || null,
+      banco_agencia: form.banco_agencia || null,
+      banco_conta: form.banco_conta || null,
+      banco_titular: form.banco_titular || null,
+      sinal_valor: form.sinal_valor ? parseFloat(form.sinal_valor) : null,
+      parcelas_quantidade: form.parcelas_quantidade ? parseInt(form.parcelas_quantidade) : null,
+      parcelas_valor: form.parcelas_valor ? parseFloat(form.parcelas_valor) : null,
     })
-    if (error) { alert('Erro: ' + error.message) }
-    else {
-      setForm({
-        property_id: '',
-        tenant_id: '',
-        type: 'rental',
-        start_date: '',
-        end_date: '',
-        value: '',
-        indice_reajuste: 'IPCA',
-        multa_rescisao: '3',
-        tem_fiador: false,
-        fiador_nome: '',
-        fiador_cpf: '',
-        fiador_rg: '',
-        fiador_endereco: '',
-        comissao_valor: '',
-        comissao_percentual: '',
-        banco_nome: '',
-        banco_agencia: '',
-        banco_conta: '',
-        banco_titular: '',
-        parcelas_quantidade: '',
-        parcelas_valor: '',
-        sinal_valor: '',        
-      })
-      setShowForm(false)
-      loadAll()
-    }
+
+    if (error) { alert('Erro: ' + error.message); setSaving(false); return }
+
+    setForm({
+      property_id: '', tenant_id: '', type: 'rental', start_date: '', end_date: '',
+      value: '', indice_reajuste: 'IPCA', multa_rescisao: '3', tem_fiador: false,
+      fiador_nome: '', fiador_cpf: '', fiador_rg: '', fiador_endereco: '',
+      comissao_valor: '', comissao_percentual: '', banco_nome: '', banco_agencia: '',
+      banco_conta: '', banco_titular: '', sinal_valor: '', parcelas_quantidade: '',
+      parcelas_valor: '',
+    })
+    setShowForm(false)
+    loadAll()
     setSaving(false)
   }
-
   async function generatePDF(contract: Contract) {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
