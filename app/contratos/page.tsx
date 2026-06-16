@@ -1230,6 +1230,234 @@ export default function ContratosPage() {
     doc.save(`contrato-administracao-${(owner?.name ?? 'imovel').toLowerCase().replace(/ /g, '-')}.pdf`)
   }
 
+ async function generateExclusividadePDF(contract: Contract) {
+  const doc = new jsPDF()
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const margin = 20
+  const contentWidth = pageWidth - margin * 2
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: perfil } = await supabase.from('user_profiles').select('*').eq('id', user!.id).single()
+
+  const property = contract.properties
+  const owner = property?.owners
+  const contratado = perfil
+
+  const startFormatted = contract.start_date
+    ? new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
+    : '___/___/______'
+  const endFormatted = contract.end_date
+    ? new Date(contract.end_date + 'T12:00:00').toLocaleDateString('pt-BR')
+    : '___/___/______'
+  const valueFormatted = contract.value
+    ? contract.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    : 'a definir'
+  const honorarios = contract.comissao_percentual ? `${contract.comissao_percentual}%` : '____%'
+  const condicoes = contract.banco_nome ?? 'A definir entre as partes'
+  const matricula = contract.banco_agencia ?? '_______________'
+
+  const addText = (text: string, y: number, indent = 0): number => {
+    if (y > 265) { doc.addPage(); y = 20 }
+    const lines = doc.splitTextToSize(text, contentWidth - indent)
+    doc.text(lines, margin + indent, y)
+    return y + lines.length * 5.5
+  }
+
+  const addClausula = (titulo: string, texto: string, y: number): number => {
+    if (y > 255) { doc.addPage(); y = 20 }
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9.5)
+    const tituloLines = doc.splitTextToSize(titulo, contentWidth)
+    doc.text(tituloLines, margin, y)
+    y += tituloLines.length * 5.5 + 1
+    doc.setFont('helvetica', 'normal')
+    const textoLines = doc.splitTextToSize(texto, contentWidth - 6)
+    if (y + textoLines.length * 5.5 > 268) { doc.addPage(); y = 20 }
+    doc.text(textoLines, margin + 6, y)
+    return y + textoLines.length * 5.5 + 4
+  }
+
+  let y = 20
+
+  // CABEÇALHO
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.text('CONTRATO DE CORRETAGEM DE VENDA DE BENS IMÓVEIS', pageWidth / 2, y, { align: 'center' })
+  y += 6
+  doc.text('COM CLÁUSULA DE EXCLUSIVIDADE', pageWidth / 2, y, { align: 'center' })
+  y += 5
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8.5)
+  doc.setTextColor(100)
+  doc.text('(Arts. 722 a 729 do Novo Código Civil c/c Art. 20, III da Lei nº 6.530/78 e Resolução COFECI nº 458/95)', pageWidth / 2, y, { align: 'center' })
+  doc.setTextColor(0)
+  y += 10
+
+  // I. CONTRATANTE
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'bold')
+  doc.text('I. CONTRATANTE:', margin, y); y += 7
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5)
+
+  if (owner?.name) {
+    doc.text(`Nome: ${owner.name}`, margin + 4, y); y += 6
+    if (owner.cpf) { doc.text(`CPF: ${owner.cpf}`, margin + 4, y); y += 6 }
+    if (owner.rg) { doc.text(`RG: ${owner.rg}`, margin + 4, y); y += 6 }
+    if (owner.address) { doc.text(`Endereço: ${owner.address}`, margin + 4, y); y += 6 }
+    if (owner.phone) { doc.text(`Telefone: ${owner.phone}`, margin + 4, y); y += 6 }
+    if (owner.email) { doc.text(`E-mail: ${owner.email}`, margin + 4, y); y += 6 }
+  } else {
+    doc.setTextColor(150)
+    doc.text('(Proprietário não vinculado — acesse Imóveis e vincule um proprietário)', margin + 4, y)
+    doc.setTextColor(0)
+    y += 6
+  }
+  y += 3
+
+  // II. CONTRATADO
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.text('II. CONTRATADO(A):', margin, y); y += 7
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5)
+  if (contratado?.full_name) {
+    doc.text(`Nome: ${contratado.full_name}`, margin + 4, y); y += 6
+    if (contratado.cpf) { doc.text(`CPF: ${contratado.cpf}`, margin + 4, y); y += 6 }
+    if (contratado.address) { doc.text(`Endereço: ${contratado.address}`, margin + 4, y); y += 6 }
+    if (contratado.phone) { doc.text(`Telefone: ${contratado.phone}`, margin + 4, y); y += 6 }
+  } else {
+    doc.setTextColor(150)
+    doc.text('(Preencha seus dados em "Meu Perfil" para aparecerem aqui)', margin + 4, y)
+    doc.setTextColor(0)
+    y += 6
+  }
+  y += 3
+
+  // III. OBJETO
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.text('III. OBJETO DO CONTRATO:', margin, y); y += 7
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5)
+  doc.text(`Imóvel: ${property.name}`, margin + 4, y); y += 6
+  doc.text(`Localização: ${property.address}`, margin + 4, y); y += 6
+  doc.text(`Matrícula: ${matricula}`, margin + 4, y); y += 6
+  doc.text(`Preço para venda: ${valueFormatted}`, margin + 4, y); y += 6
+  doc.text(`Condições de pagamento: ${condicoes}`, margin + 4, y); y += 6
+  y += 4
+
+  // CLÁUSULAS
+  y = addClausula(
+    'PRIMEIRA —',
+    `O presente instrumento tem por finalidade a intermediação na comercialização do imóvel de propriedade do CONTRATANTE, descrito no item III, que o CONTRATANTE declara estar desembaraçado de qualquer ônus ou gravame, inclusive de natureza tributária.`,
+    y
+  )
+
+  y = addClausula(
+    'SEGUNDA —',
+    'A intermediação ora contratada é realizada em caráter de EXCLUSIVIDADE, obrigando-se o CONTRATANTE a não tratar diretamente sobre a venda, direta ou indiretamente, sob pena da remuneração ser devida integralmente ao CONTRATADO, nos termos do art. 726 do Novo Código Civil.',
+    y
+  )
+
+  y = addClausula(
+    'TERCEIRA —',
+    'Para realização do serviço ora acertado, o CONTRATANTE autoriza o CONTRATADO a promover visitas ao imóvel, bem como o autoriza à realização de divulgação no próprio imóvel, por meio de placa, faixa, internet ou qualquer outra forma a critério do CONTRATADO.',
+    y
+  )
+
+  y = addClausula(
+    'QUARTA —',
+    'O CONTRATADO somente poderá fechar negócio por valor ou condição diferente do estipulado no item III mediante aceite expresso do CONTRATANTE. Sendo proposta de valor e condições rigorosamente iguais ao estipulado, o CONTRATADO está autorizado a fechar o negócio sem necessidade de aceite do CONTRATANTE.',
+    y
+  )
+
+  y = addClausula(
+    'QUINTA —',
+    `Pela intermediação ora acertada, o CONTRATANTE pagará ao CONTRATADO, a título de honorários, o percentual de ${honorarios} calculados sobre o valor total pelo qual a transação for fechada.\n§ 1º — Os honorários serão pagos de uma só vez no exato momento do recebimento do sinal de negócio ou, se não houver sinal, por ocasião da assinatura da escritura pública.\n§ 2º — A remuneração é devida ao CONTRATADO desde que tenha conseguido o resultado útil previsto neste contrato, ainda que este não se efetive em virtude de arrependimento das partes, nos termos do art. 725 do Novo Código Civil.`,
+    y
+  )
+
+  y = addClausula(
+    'SEXTA —',
+    `Este contrato é válido de ${startFormatted} até ${endFormatted}. Ao final do prazo, as partes acertarão a renovação ou não através de aditivo.`,
+    y
+  )
+
+  y = addClausula(
+    'SÉTIMA —',
+    'Caso a negociação se concretize após o prazo da referida contratação, por efeitos do trabalho do CONTRATADO, independentemente de prazo, lhe será devida integralmente a remuneração pela corretagem, nos termos do artigo 727 do Novo Código Civil.',
+    y
+  )
+
+  y = addClausula(
+    'OITAVA —',
+    'O CONTRATADO poderá fazer parceria com outra imobiliária ou corretor para venda do imóvel, ficando com a responsabilidade total pelo encaminhamento das negociações, bem como pelo acerto de comissão com o co-participante.',
+    y
+  )
+
+  y = addClausula(
+    'NONA —',
+    'Em caso de rescisão ou arrependimento deste instrumento por parte do CONTRATANTE, já tendo o CONTRATADO oferecido o imóvel e gasto com anúncios, fica o CONTRATANTE sujeito ao pagamento de todas as despesas efetuadas pelo CONTRATADO.',
+    y
+  )
+
+  y = addClausula(
+    'DÉCIMA —',
+    'As partes elegem o foro da comarca da situação do imóvel para dirimir qualquer dúvida relacionada a este instrumento, renunciando a qualquer outro, por mais privilegiado que seja.',
+    y
+  )
+
+  // ASSINATURAS
+  if (y > 220) { doc.addPage(); y = 20 }
+  y = addText(`E por estarem justas e contratadas, as partes assinam o presente contrato em 02 (duas) vias de igual teor e forma, na presença das testemunhas.`, y)
+  y += 4
+  y = addText(`[cidade/estado], ${new Date().toLocaleDateString('pt-BR')}.`, y)
+  y += 14
+
+  // Linha contratante / contratado
+  doc.line(margin, y, margin + 70, y)
+  doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+  y += 5
+  doc.setFontSize(9)
+  doc.text(owner?.name ?? 'CONTRATANTE', margin + 35, y, { align: 'center' })
+  doc.text(contratado?.full_name ?? 'CONTRATADO', pageWidth / 2 + 45, y, { align: 'center' })
+  y += 4
+  doc.setTextColor(120)
+  doc.text('CONTRATANTE', margin + 35, y, { align: 'center' })
+  doc.text('CONTRATADO', pageWidth / 2 + 45, y, { align: 'center' })
+  doc.setTextColor(0)
+  y += 14
+
+  // Cônjuges
+  if (y > 255) { doc.addPage(); y = 20 }
+  doc.line(margin, y, margin + 70, y)
+  doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+  y += 5
+  doc.setTextColor(120)
+  doc.setFontSize(9)
+  doc.text('Cônjuge do Contratante', margin + 35, y, { align: 'center' })
+  doc.text('Cônjuge do Contratado', pageWidth / 2 + 45, y, { align: 'center' })
+  doc.setTextColor(0)
+  y += 14
+
+  // Testemunhas
+  if (y > 255) { doc.addPage(); y = 20 }
+  doc.line(margin, y, margin + 70, y)
+  doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+  y += 5
+  doc.setTextColor(120)
+  doc.text('Testemunha 1 — CPF: _______________', margin + 35, y, { align: 'center' })
+  doc.text('Testemunha 2 — CPF: _______________', pageWidth / 2 + 45, y, { align: 'center' })
+  doc.setTextColor(0)
+
+  doc.setFontSize(7)
+  doc.setTextColor(150)
+  doc.text('Gerado por ImobApp · imobapp.com.br · Arts. 722-729 Novo Código Civil', pageWidth / 2, 290, { align: 'center' })
+
+  doc.save(`contrato-exclusividade-${(owner?.name ?? 'imovel').toLowerCase().replace(/ /g, '-')}.pdf`)
+} 
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
         <Sidebar />
@@ -1520,6 +1748,44 @@ export default function ContratosPage() {
                       <option value="2">2 meses</option>
                       <option value="3">3 meses</option>
                     </select>
+                  </div>
+                </>
+              )}
+              {form.type === 'exclusividade' && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Data de início</label>
+                    <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Data de término</label>
+                    <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Preço para venda (R$)</label>
+                    <input type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })}
+                      placeholder="Ex: 350000"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Honorários (%)</label>
+                    <input type="number" value={form.comissao_percentual} onChange={e => setForm({ ...form, comissao_percentual: e.target.value })}
+                      placeholder="Ex: 6"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Condições de pagamento</label>
+                    <input type="text" value={form.banco_nome} onChange={e => setForm({ ...form, banco_nome: e.target.value })}
+                      placeholder="Ex: À vista, financiamento, permuta..."
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Nº matrícula do imóvel</label>
+                    <input type="text" value={form.banco_agencia} onChange={e => setForm({ ...form, banco_agencia: e.target.value })}
+                      placeholder="Ex: 12345"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                 </>
               )}
