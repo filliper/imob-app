@@ -1868,6 +1868,7 @@ export default function ContratosPage() {
                     else if (c.type === 'promessa_compra_venda') generatePromessaPDF(c)
                     else if (c.type === 'commercial') generateLocacaoComercialPDF(c)
                     else if (c.type === 'administracao') generateAdministracaoPDF(c)
+                    else if (c.type === 'exclusividade') generateExclusividadePDF(c)
                     else generatePDF(c)
                   }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-2"
