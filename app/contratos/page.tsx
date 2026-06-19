@@ -89,6 +89,11 @@ export default function ContratosPage() {
     sinal_valor: '',
     parcelas_quantidade: '',
     parcelas_valor: '',
+    servico_descricao: '',
+    servico_prazo_inicio: '',
+    multa_atraso_pgto: '',
+    multa_descumprimento: '',
+    prazo_rescisao_dias: '',    
   })
 
   const supabase = createClient()
@@ -194,6 +199,11 @@ export default function ContratosPage() {
       sinal_valor: form.sinal_valor ? parseFloat(form.sinal_valor) : null,
       parcelas_quantidade: form.parcelas_quantidade ? parseInt(form.parcelas_quantidade) : null,
       parcelas_valor: form.parcelas_valor ? parseFloat(form.parcelas_valor) : null,
+      servico_descricao: form.servico_descricao || null,
+      servico_prazo_inicio: form.servico_prazo_inicio ? parseInt(form.servico_prazo_inicio) : null,
+      multa_atraso_pgto: form.multa_atraso_pgto ? parseFloat(form.multa_atraso_pgto) : null,
+      multa_descumprimento: form.multa_descumprimento ? parseFloat(form.multa_descumprimento) : null,
+      prazo_rescisao_dias: form.prazo_rescisao_dias ? parseInt(form.prazo_rescisao_dias) : null,      
     })
 
     if (error) { alert('Erro: ' + error.message); setSaving(false); return }
@@ -205,6 +215,7 @@ export default function ContratosPage() {
       comissao_valor: '', comissao_percentual: '', banco_nome: '', banco_agencia: '',
       banco_conta: '', banco_titular: '', sinal_valor: '', parcelas_quantidade: '',
       parcelas_valor: '',
+      servico_descricao: '', servico_prazo_inicio: '', multa_atraso_pgto: '', multa_descumprimento: '', prazo_rescisao_dias: '',
     })
     setShowForm(false)
     loadAll()
@@ -1632,6 +1643,175 @@ export default function ContratosPage() {
     doc.save(`contrato-compra-venda-${buyer.name.toLowerCase().replace(/ /g, '-')}.pdf`)
   }
 
+  async function generateServicosPDF(contract: Contract) {
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 20
+    const contentWidth = pageWidth - margin * 2
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: perfil } = await supabase.from('user_profiles').select('*').eq('id', user!.id).single()
+
+    const prestador = contract.tenants
+    const contratante = perfil
+
+    const dataAssinatura = contract.start_date
+      ? new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
+      : new Date().toLocaleDateString('pt-BR')
+    const valueFormatted = contract.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    const servico = contract.servico_descricao ?? 'serviços especializados'
+    const prazoInicio = contract.servico_prazo_inicio ?? 5
+    const multaAtraso = contract.multa_atraso_pgto ?? 2
+    const multaDescump = contract.multa_descumprimento ?? 10
+    const prazoRescisao = contract.prazo_rescisao_dias ?? 15
+
+    const addText = (text: string, y: number, indent = 0): number => {
+      if (y > 265) { doc.addPage(); y = 20 }
+      const lines = doc.splitTextToSize(text, contentWidth - indent)
+      doc.text(lines, margin + indent, y)
+      return y + lines.length * 5.5
+    }
+
+    const addSection = (title: string, y: number): number => {
+      if (y > 258) { doc.addPage(); y = 20 }
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.text(title, margin, y)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9.5)
+      return y + 7
+    }
+
+    const addItem = (text: string, y: number): number => {
+      if (y > 265) { doc.addPage(); y = 20 }
+      const lines = doc.splitTextToSize(text, contentWidth - 6)
+      doc.text(lines, margin + 6, y)
+      return y + lines.length * 5.5 + 1
+    }
+
+    let y = 20
+
+    // TÍTULO
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(13)
+    doc.text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', pageWidth / 2, y, { align: 'center' })
+    y += 10
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    doc.setFont('helvetica', 'bold')
+    doc.text('DAS PARTES', margin, y); y += 7
+    doc.setFont('helvetica', 'normal')
+
+    // CONTRATADA (prestador de serviço)
+    y = addItem(`${prestador.name}${prestador.cpf ? `, CPF nº ${prestador.cpf}` : ''}${prestador.email ? `, e-mail: ${prestador.email}` : ''}${prestador.phone ? `, telefone: ${prestador.phone}` : ''}, doravante denominada CONTRATADA;`, y)
+    y += 3
+    doc.setFont('helvetica', 'bold')
+    doc.text('e', margin, y); y += 6
+    doc.setFont('helvetica', 'normal')
+
+    // CONTRATANTE (você/seu perfil)
+    if (contratante?.full_name) {
+      y = addItem(`${contratante.full_name}${contratante.cpf ? `, CPF nº ${contratante.cpf}` : ''}${contratante.rg ? `, RG nº ${contratante.rg}` : ''}${contratante.address ? `, residente na ${contratante.address}` : ''}${contratante.phone ? `, telefone: ${contratante.phone}` : ''}, doravante denominado CONTRATANTE.`, y)
+    } else {
+      y = addItem('(Preencha seus dados em "Meu Perfil" para aparecerem aqui), doravante denominado CONTRATANTE.', y)
+    }
+    y += 4
+
+    y = addText('Assim sendo, ambas as partes decidem celebrar o presente CONTRATO DE PRESTAÇÃO DE SERVIÇOS, mediante as cláusulas e condições definidas a seguir.', y)
+    y += 6
+
+    // CLÁUSULAS
+    y = addSection('CLÁUSULA PRIMEIRA — DO OBJETO', y)
+    y = addItem(`1.1 Este contrato refere-se à prestação de serviços profissionais especializados em ${servico} pela CONTRATADA, conforme os termos e condições detalhados neste presente contrato.`, y)
+    y += 3
+
+    y = addSection('CLÁUSULA SEGUNDA — OBRIGAÇÕES DA CONTRATANTE', y)
+    y = addItem('2.1 Caberá à CONTRATANTE fornecer à CONTRATADA todas as informações necessárias à realização do serviço, especificando os detalhes fundamentais à sua consecução.', y)
+    y = addItem('2.2 O pagamento deve ser efetuado pela CONTRATANTE de acordo com a forma e condições estabelecidas na cláusula específica deste contrato.', y)
+    y += 3
+
+    y = addSection('CLÁUSULA TERCEIRA — OBRIGAÇÕES DA CONTRATADA', y)
+    y = addItem('3.1 A CONTRATADA deverá realizar os serviços solicitados pela CONTRATANTE conforme acordado.', y)
+    y = addItem('3.2 A CONTRATADA se obriga a manter absoluto sigilo sobre as operações, dados, estratégias e informações da CONTRATANTE, mesmo após a conclusão dos serviços, sendo vedada a comercialização ou uso para outras finalidades.', y)
+    y = addItem('3.3 Será de responsabilidade da CONTRATADA o ônus trabalhista ou tributário referente a funcionários envolvidos na prestação do serviço, ficando a CONTRATANTE isenta de qualquer obrigação em relação a eles.', y)
+    y = addItem('3.4 A CONTRATADA deverá fornecer os documentos fiscais referentes ao(s) pagamento(s) do serviço.', y)
+    y += 3
+
+    y = addSection('CLÁUSULA QUARTA — DOS SERVIÇOS', y)
+    y = addItem(`4.1 A CONTRATADA realizará os serviços contratados conforme especificado: ${servico}.`, y)
+    y = addItem(`4.2 Os serviços terão início em ${prazoInicio} (${prazoInicio === 1 ? 'um' : prazoInicio} dias) dias corridos da assinatura deste contrato.`, y)
+    y += 3
+
+    y = addSection('CLÁUSULA QUINTA — DO PREÇO E DAS CONDIÇÕES DE PAGAMENTO', y)
+    y = addItem(`5.1 A CONTRATANTE se responsabiliza a pagar o valor de ${valueFormatted} à CONTRATADA pelos serviços prestados, até a finalização do serviço.`, y)
+    y = addItem(`5.2 Caso haja mais de 10 dias de atraso no pagamento, será devida multa moratória de ${multaAtraso}% sobre a parcela inadimplida.`, y)
+    y = addItem('5.3 Considera-se o cumprimento integral do contrato o momento em que todos os serviços especificados tenham sido concluídos, sob aprovação e revisão final da CONTRATANTE.', y)
+    y += 3
+
+    y = addSection('CLÁUSULA SEXTA — DO DESCUMPRIMENTO', y)
+    y = addItem('6.1 O descumprimento de qualquer uma das cláusulas por qualquer parte implicará na rescisão imediata deste contrato.', y)
+    y = addItem(`6.2 Havendo descumprimento deste contrato, será devida multa de ${multaDescump}% sobre o valor do contrato.`, y)
+    y += 3
+
+    y = addSection('CLÁUSULA SÉTIMA — DO PRAZO E VALIDADE', y)
+    y = addItem('7.1 A CONTRATADA deverá realizar os serviços dentro dos prazos determinados pela CONTRATANTE, sendo sua responsabilidade comunicar a impossibilidade de cumprimento, podendo as partes estabelecer novo prazo.', y)
+    y = addItem('7.2 Este instrumento é válido por prazo indeterminado, vigendo até a finalização do serviço.', y)
+    y += 3
+
+    y = addSection('CLÁUSULA OITAVA — DA RESCISÃO IMOTIVADA', y)
+    y = addItem(`8.1 Poderá o presente instrumento ser rescindido por qualquer das partes, em qualquer momento, sem motivo relevante, respeitando-se período mínimo de ${prazoRescisao} dias de antecedência, cabendo à CONTRATANTE pagar apenas os valores referentes aos serviços em andamento.`, y)
+    y += 3
+
+    y = addSection('CLÁUSULA NONA — DA OBSERVÂNCIA À LGPD', y)
+    y = addItem('9.1 A CONTRATANTE expressa consentimento de que a CONTRATADA irá coletar, tratar e compartilhar os dados necessários para o cumprimento do contrato, nos termos do Art. 7º, inc. V da LGPD, e demais leis referentes à utilização de dados.', y)
+    y += 3
+
+    y = addSection('CLÁUSULA DÉCIMA — DA AUSÊNCIA DE VÍNCULO TRABALHISTA', y)
+    y = addItem('10.1 Este contrato expressa a total inexistência de vínculo trabalhista entre as partes.', y)
+    y = addItem('10.2 Não há subordinação, pessoalidade ou habitualidade na relação entre as partes, não se configurando qualquer vínculo empregatício.', y)
+    y += 3
+
+    y = addSection('CLÁUSULA DÉCIMA PRIMEIRA — DO FORO', y)
+    y = addItem('11.1 Para dirimir quaisquer controvérsias oriundas do presente contrato, as partes elegem o foro da comarca de domicílio da CONTRATANTE.', y)
+    y += 8
+
+    // ASSINATURAS
+    if (y > 225) { doc.addPage(); y = 20 }
+    y = addText('Justos e de acordo, firmam o presente instrumento, em duas vias de igual teor, juntamente com 2 (duas) testemunhas.', y)
+    y += 4
+    y = addText(`[Local], ${dataAssinatura}.`, y)
+    y += 14
+
+    doc.line(margin, y, margin + 70, y)
+    doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+    y += 5
+    doc.setFontSize(9)
+    doc.text(contratante?.full_name ?? 'CONTRATANTE', margin + 35, y, { align: 'center' })
+    doc.text(prestador.name, pageWidth / 2 + 45, y, { align: 'center' })
+    y += 4
+    doc.setTextColor(120)
+    doc.text('CONTRATANTE', margin + 35, y, { align: 'center' })
+    doc.text('CONTRATADA', pageWidth / 2 + 45, y, { align: 'center' })
+    doc.setTextColor(0)
+    y += 14
+
+    if (y > 255) { doc.addPage(); y = 20 }
+    doc.text('Testemunhas:', margin, y); y += 8
+    doc.line(margin, y, margin + 70, y)
+    doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+    y += 5
+    doc.setTextColor(120)
+    doc.text('1. Nome: _______________  CPF: _______________', margin, y)
+    doc.text('2. Nome: _______________  CPF: _______________', pageWidth / 2 + 10, y)
+    doc.setTextColor(0)
+
+    doc.setFontSize(7)
+    doc.setTextColor(150)
+    doc.text('Gerado por ImobApp · imobapp.com.br', pageWidth / 2, 290, { align: 'center' })
+
+    doc.save(`contrato-prestacao-servicos-${prestador.name.toLowerCase().replace(/ /g, '-')}.pdf`)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
         <Sidebar />
@@ -1996,8 +2176,14 @@ export default function ContratosPage() {
               {/* ── CAMPOS PARA PRESTAÇÃO DE SERVIÇOS ── */}
               {form.type === 'servicos' && (
                 <>
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium text-gray-700">Descrição do serviço</label>
+                    <input type="text" value={form.servico_descricao} onChange={e => setForm({ ...form, servico_descricao: e.target.value })}
+                      placeholder="Ex: Reparo hidráulico, pintura, instalação elétrica..."
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Prestador de serviço (inquilino)</label>
+                    <label className="text-sm font-medium text-gray-700">Prestador de serviço</label>
                     <select value={form.tenant_id} onChange={e => setForm({ ...form, tenant_id: e.target.value })}
                       className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
                       <option value="">Selecione o prestador</option>
@@ -2011,13 +2197,32 @@ export default function ContratosPage() {
                       className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Data de início</label>
+                    <label className="text-sm font-medium text-gray-700">Data de assinatura</label>
                     <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
                       className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700">Data de término</label>
-                    <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
+                    <label className="text-sm font-medium text-gray-700">Prazo para início (dias corridos)</label>
+                    <input type="number" value={form.servico_prazo_inicio} onChange={e => setForm({ ...form, servico_prazo_inicio: e.target.value })}
+                      placeholder="Ex: 5"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Multa por atraso no pagamento (%)</label>
+                    <input type="number" value={form.multa_atraso_pgto} onChange={e => setForm({ ...form, multa_atraso_pgto: e.target.value })}
+                      placeholder="Ex: 2"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Multa por descumprimento (%)</label>
+                    <input type="number" value={form.multa_descumprimento} onChange={e => setForm({ ...form, multa_descumprimento: e.target.value })}
+                      placeholder="Ex: 10"
+                      className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Antecedência p/ rescisão (dias)</label>
+                    <input type="number" value={form.prazo_rescisao_dias} onChange={e => setForm({ ...form, prazo_rescisao_dias: e.target.value })}
+                      placeholder="Ex: 15"
                       className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                 </>
