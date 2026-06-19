@@ -64,6 +64,12 @@ type Contract = {
   prazo_rescisao_dias?: number | null
 }
 
+type Clausula = {
+  id: string
+  titulo: string
+  texto: string
+}
+
 export default function ContratosPage() {
   const [contracts, setContracts] = useState<Contract[]>([])
   const [properties, setProperties] = useState<Property[]>([])
@@ -108,8 +114,10 @@ export default function ContratosPage() {
     service: 'Prestação de Serviço',
     sale: 'Compra e Venda',
   }
-
-  useEffect(() => { loadAll() }, [])
+  const [showClausulasEditor, setShowClausulasEditor] = useState(false)
+  const [clausulas, setClausulas] = useState<Clausula[]>([])
+  const [contractParaGerar, setContractParaGerar] = useState<Contract | null>(null)
+    useEffect(() => { loadAll() }, [])
 
   async function loadAll() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -226,6 +234,166 @@ export default function ContratosPage() {
     loadAll()
     setSaving(false)
   }
+
+  function montarClausulasPadrao(contract: Contract): Clausula[] {
+    const property = contract.properties
+    const tenant = contract.tenants
+    const owner = property?.owners
+    const startFormatted = contract.start_date ? new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '___/___/______'
+    const endFormatted = contract.end_date ? new Date(contract.end_date + 'T12:00:00').toLocaleDateString('pt-BR') : 'indeterminado'
+    const valueFormatted = contract.value?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? 'a definir'
+    const indice = contract.indice_reajuste ?? 'IPCA'
+    const multa = contract.multa_rescisao ?? '3'
+    const multaExt = multa === '1' ? 'um' : multa === '2' ? 'dois' : 'três'
+
+    if (contract.type === 'rental') {
+      return [
+        { id: 'c1', titulo: '1. OBJETO', texto: `O objeto do presente instrumento consiste na locação pelo Locatário do imóvel de propriedade do Locador, situado na ${property?.address} (o "Imóvel").` },
+        { id: 'c2', titulo: '2. DA DESTINAÇÃO DO IMÓVEL', texto: 'O LOCATÁRIO declara que o imóvel, ora locado, destina-se única e exclusivamente para o seu uso RESIDENCIAL. O uso indevido e/ou diverso do Imóvel será motivo para a rescisão contratual e consequente despejo por infração contratual.' },
+        { id: 'c3', titulo: '3. DO PRAZO DA LOCAÇÃO', texto: `O Locador dá em locação ao Locatário o Imóvel a partir de ${startFormatted}, para terminar em ${endFormatted}. O Locatário declara haver vistoriado o Imóvel e que o está recebendo em perfeito estado de limpeza, conservação e funcionalidade.` },
+        { id: 'c4', titulo: '4. DO VALOR DO ALUGUEL', texto: `O aluguel mensal livremente ajustado entre as partes é de ${valueFormatted}, a contar de ${startFormatted}. O aluguel será reajustado anualmente de acordo com a variação acumulada do ${indice}.` },
+        { id: 'c5', titulo: '5. DO VENCIMENTO', texto: 'O Locatário obriga-se a pagar o valor do aluguel mensal até o dia 10 (dez) de cada mês. Após o vencimento, o valor devido será acrescido de multa de 10%, juros de mora de 1% ao mês e correção pelo índice contratual.' },
+        { id: 'c6', titulo: '6. DAS BENFEITORIAS', texto: 'O Locatário obriga-se a manter o imóvel em perfeitas condições de higiene e limpeza, restituindo-o nas mesmas condições em que o recebeu. É vedado efetuar reforma sem prévia autorização escrita do Locador.' },
+        { id: 'c7', titulo: '7. DOS ENCARGOS', texto: 'Correrão por conta do Locatário todas as despesas de energia elétrica, água, esgoto, gás, condomínio e tributos incidentes sobre o imóvel.' },
+        { id: 'c8', titulo: '8. DA VISTORIA DO IMÓVEL', texto: 'O Locador fica autorizado a vistoriar o imóvel sempre que julgar conveniente, nos dias úteis entre 8h e 18h, mediante aviso prévio de 24 horas.' },
+        { id: 'c9', titulo: '9. DA MULTA', texto: `A infração de qualquer cláusula sujeitará o infrator a multa equivalente a ${multa} (${multaExt}) mês(es) de aluguel.` },
+        { id: 'c10', titulo: '10. DA RESCISÃO', texto: `Em caso de rescisão antecipada pelo locatário, será devida multa equivalente a ${multa} (${multaExt}) mês(es) de aluguel.` },
+        { id: 'c11', titulo: '11. DISPOSIÇÕES GERAIS', texto: 'O presente contrato é regido pela Lei do Inquilinato (Lei nº 8.245/91) e pelo Código Civil Brasileiro. Fica eleito o foro da comarca local para dirimir quaisquer dúvidas.' },
+      ]
+    }
+
+    if (contract.type === 'commercial') {
+      return [
+        { id: 'c1', titulo: '1. DO OBJETO', texto: `Locação pelo Locatário do imóvel de propriedade do Locador, situado na ${property?.address}.` },
+        { id: 'c2', titulo: '2. DA DESTINAÇÃO', texto: 'O imóvel destina-se única e exclusivamente para uso COMERCIAL.' },
+        { id: 'c3', titulo: '3. DO PRAZO', texto: `Locação a partir de ${startFormatted} até ${endFormatted}. Após o 15º mês, fica facultado ao Locatário rescindir sem penalidade mediante notificação escrita.` },
+        { id: 'c4', titulo: '4. DO VALOR', texto: `Aluguel mensal de ${valueFormatted}, reajustado anualmente pelo ${indice}.` },
+        { id: 'c5', titulo: '5. DO VENCIMENTO', texto: 'Pagamento até o dia 10 de cada mês. Multa de 10%, juros de 1% ao mês e honorários de 20% em cobrança judicial.' },
+        { id: 'c6', titulo: '6. DAS BENFEITORIAS', texto: 'Manutenção das condições do imóvel, vedada reforma sem autorização escrita.' },
+        { id: 'c7', titulo: '7. DOS ENCARGOS', texto: 'Despesas de água, luz, gás, condomínio e tributos por conta do Locatário.' },
+        { id: 'c8', titulo: '8. DA VISTORIA', texto: 'Vistorias mediante aviso prévio de 24 horas, em dias úteis das 8h às 18h.' },
+        { id: 'c9', titulo: '9. DA MULTA', texto: `Multa equivalente a ${multa} (${multaExt}) aluguéis em caso de infração contratual.` },
+        { id: 'c10', titulo: '10. DA SUBLOCAÇÃO', texto: 'Vedada sublocação sem consentimento prévio e por escrito do Locador.' },
+        { id: 'c11', titulo: '11. DO DIREITO DE PREFERÊNCIA', texto: 'Direito de preferência para aquisição do imóvel, nos termos dos artigos 27 e seguintes da Lei 8.245/91.' },
+        { id: 'c12', titulo: '12. DO FORO', texto: 'Foro da situação do imóvel para dirimir quaisquer dúvidas.' },
+      ]
+    }
+
+    if (contract.type === 'intermediacao') {
+      const comissaoTexto = contract.comissao_valor
+        ? contract.comissao_valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        : contract.comissao_percentual ? `${contract.comissao_percentual}% sobre o valor do negócio` : 'a definir'
+      return [
+        { id: 'c1', titulo: 'CLÁUSULA 1ª — OBJETO', texto: `Contratação dos serviços da CONTRATADA para intermediação de venda/locação do imóvel situado na ${property?.address}.` },
+        { id: 'c2', titulo: 'CLÁUSULA 2ª — DA CONTRATAÇÃO', texto: `A CONTRATANTE pagará pela intermediação o valor de ${comissaoTexto}.` },
+        { id: 'c3', titulo: 'CLÁUSULA 3ª — DO INADIMPLEMENTO', texto: 'Correção pelo IGPM-FGV, juros de 1% ao mês e multa de 2% sobre débito corrigido.' },
+        { id: 'c4', titulo: 'CLÁUSULA 4ª — TÍTULO EXECUTIVO', texto: 'Comissões são dívida líquida, certa e exigível, título executivo extrajudicial (art. 585 CPC).' },
+        { id: 'c5', titulo: 'CLÁUSULA 5ª — DO RESULTADO ÚTIL', texto: 'Comissão devida mesmo em caso de desistência pelo CONTRATANTE, nos termos do art. 725 do Código Civil.' },
+        { id: 'c6', titulo: 'CLÁUSULA 6ª — DA DOCUMENTAÇÃO', texto: 'Entrega de documentação pessoal em até 72 horas.' },
+        { id: 'c7', titulo: 'CLÁUSULA 7ª — DA LGPD', texto: 'Sigilo e tratamento de dados conforme Lei 13.709/2018.' },
+        { id: 'c8', titulo: 'CLÁUSULA 8ª — DO FORO', texto: 'Foro da comarca da situação do imóvel.' },
+      ]
+    }
+
+    if (contract.type === 'promessa_compra_venda') {
+      const sinalFormatted = contract.sinal_valor?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? 'a definir'
+      return [
+        { id: 'c1', titulo: '1. OBJETO', texto: `Compromisso de venda e compra do imóvel situado na ${property?.address}.` },
+        { id: 'c2', titulo: '2. DO IMÓVEL', texto: `Imóvel identificado como "${property?.name}".` },
+        { id: 'c3', titulo: '3. DO PREÇO', texto: `Preço total de ${valueFormatted}, com sinal de ${sinalFormatted}.` },
+        { id: 'c4', titulo: '4. DA TRANSFERÊNCIA DA POSSE', texto: `Posse transmitida na data prevista para escritura: ${endFormatted}.` },
+        { id: 'c5', titulo: '5. DOS TRIBUTOS', texto: 'Tributos até a posse por conta da VENDEDORA; ITBI e emolumentos por conta da COMPRADORA.' },
+        { id: 'c6', titulo: '6. DA IRREVOGABILIDADE', texto: 'Contrato irrevogável e irretratável nos termos do art. 420 do Código Civil.' },
+        { id: 'c7', titulo: '7. DA DOCUMENTAÇÃO', texto: 'Entrega de certidões e documentos em até 15 dias úteis.' },
+        { id: 'c8', titulo: '8. DA INADIMPLÊNCIA', texto: 'Multa de 10% sobre valor inadimplido, juros de 1% ao mês.' },
+        { id: 'c9', titulo: '9. DA RESCISÃO', texto: 'Multa de 10% sobre valor do contrato em caso de rescisão por qualquer parte.' },
+        { id: 'c10', titulo: '10. DA LGPD', texto: 'Sigilo e tratamento de dados conforme Lei 13.709/2018.' },
+        { id: 'c11', titulo: '11. DO FORO', texto: 'Foro da situação do imóvel.' },
+      ]
+    }
+
+    if (contract.type === 'administracao') {
+      const taxaAdmin = contract.value?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? 'a definir'
+      const percentual = contract.comissao_percentual ? `${contract.comissao_percentual}%` : 'a definir'
+      return [
+        { id: 'c1', titulo: '1. DO OBJETO', texto: `Prestação de serviços de administração do imóvel "${property?.name}", situado na ${property?.address}.` },
+        { id: 'c2', titulo: '2. DO PRAZO', texto: `Contrato de ${startFormatted} a ${endFormatted}.` },
+        { id: 'c3', titulo: '3. DA PROCURAÇÃO', texto: 'Autorização para divulgação, recebimento e quitação de aluguéis em nome do CONTRATANTE.' },
+        { id: 'c4', titulo: '4. OBRIGAÇÕES DA CONTRATADA', texto: 'Análise cadastral de locatários, divulgação do imóvel, repasse dos valores, cobrança em caso de inadimplência, vistorias periódicas e prestação de contas mensal.' },
+        { id: 'c5', titulo: '5. OBRIGAÇÕES DO CONTRATANTE', texto: 'Manter tributos quitados, entregar imóvel em perfeito funcionamento, arcar com encargos no período de vacância.' },
+        { id: 'c6', titulo: '6. DA REMUNERAÇÃO', texto: `Taxa de administração de ${taxaAdmin}/mês e percentual de ${percentual} do aluguel.` },
+        { id: 'c7', titulo: '7. DA ASSISTÊNCIA JURÍDICA', texto: 'Patrocínio de ações de cobrança, despejo e revisionais sem ônus adicional ao CONTRATANTE.' },
+        { id: 'c8', titulo: '8. DA RESCISÃO', texto: 'Rescisão mediante notificação com 30 dias de antecedência.' },
+        { id: 'c9', titulo: '9. DA MULTA', texto: 'Multa equivalente a meses da taxa de administração em caso de infração contratual.' },
+        { id: 'c10', titulo: '10. DA LGPD', texto: 'Sigilo e tratamento de dados conforme Lei 13.709/2018.' },
+        { id: 'c11', titulo: '11. DO FORO', texto: 'Foro da comarca da situação do imóvel.' },
+      ]
+    }
+
+    if (contract.type === 'exclusividade') {
+      const honorarios = contract.comissao_percentual ? `${contract.comissao_percentual}%` : 'a definir'
+      return [
+        { id: 'c1', titulo: 'PRIMEIRA', texto: `Intermediação na comercialização do imóvel "${property?.name}", livre de ônus.` },
+        { id: 'c2', titulo: 'SEGUNDA', texto: 'Intermediação em caráter de EXCLUSIVIDADE, nos termos do art. 726 do Código Civil.' },
+        { id: 'c3', titulo: 'TERCEIRA', texto: 'Autorização para visitas e divulgação do imóvel por qualquer meio.' },
+        { id: 'c4', titulo: 'QUARTA', texto: 'Negociação por valor diferente do estipulado requer aceite expresso do CONTRATANTE.' },
+        { id: 'c5', titulo: 'QUINTA', texto: `Honorários de ${honorarios} sobre o valor da transação, devidos mesmo em caso de arrependimento (art. 725 CC).` },
+        { id: 'c6', titulo: 'SEXTA', texto: `Vigência de ${startFormatted} a ${endFormatted}.` },
+        { id: 'c7', titulo: 'SÉTIMA', texto: 'Comissão devida mesmo após o prazo, se resultado do trabalho do CONTRATADO (art. 727 CC).' },
+        { id: 'c8', titulo: 'OITAVA', texto: 'Possibilidade de parceria com outras imobiliárias.' },
+        { id: 'c9', titulo: 'NONA', texto: 'Reembolso de despesas em caso de rescisão/arrependimento do CONTRATANTE.' },
+        { id: 'c10', titulo: 'DÉCIMA', texto: 'Foro da comarca da situação do imóvel.' },
+      ]
+    }
+
+    if (contract.type === 'compra_venda') {
+      return [
+        { id: 'c1', titulo: 'ITEM 03 — DESCRIÇÃO DO IMÓVEL', texto: `${property?.name}, situado na ${property?.address}.` },
+        { id: 'c2', titulo: 'ITEM 04 — DO PREÇO', texto: `Preço de ${valueFormatted}, pago integralmente à vista na assinatura.` },
+        { id: 'c3', titulo: 'ITEM 05 — DA POSSE', texto: 'Entrega após liberação do pagamento integral. Débitos anteriores são responsabilidade do VENDEDOR.' },
+        { id: 'c4', titulo: 'ITEM 06 — DA ESCRITURA', texto: 'Escritura lavrada em nome do(s) comprador(es).' },
+        { id: 'c5', titulo: 'ITEM 07 — DA DOCUMENTAÇÃO', texto: 'Entrega de matrícula, IPTU quitado, certidões pessoais e demais documentos na lavratura.' },
+        { id: 'c6', titulo: 'ITEM 08 — IRREVOGABILIDADE', texto: 'Negócio irrevogável e irretratável (arts. 417-420 CC).' },
+        { id: 'c7', titulo: 'ITEM 09 — DECLARAÇÕES FINAIS', texto: 'Despesas de transferência por conta do COMPRADOR. VENDEDOR responde por evicção de direito.' },
+      ]
+    }
+
+    if (contract.type === 'servicos') {
+      const servico = contract.servico_descricao ?? 'serviços especializados'
+      return [
+        { id: 'c1', titulo: 'CLÁUSULA PRIMEIRA — DO OBJETO', texto: `Prestação de serviços de ${servico} pela CONTRATADA.` },
+        { id: 'c2', titulo: 'CLÁUSULA SEGUNDA — OBRIGAÇÕES DA CONTRATANTE', texto: 'Fornecer informações necessárias e efetuar pagamento conforme acordado.' },
+        { id: 'c3', titulo: 'CLÁUSULA TERCEIRA — OBRIGAÇÕES DA CONTRATADA', texto: 'Realizar os serviços, manter sigilo, responder por ônus trabalhista e fornecer documentos fiscais.' },
+        { id: 'c4', titulo: 'CLÁUSULA QUARTA — DOS SERVIÇOS', texto: `Início em ${contract.servico_prazo_inicio ?? 5} dias corridos da assinatura.` },
+        { id: 'c5', titulo: 'CLÁUSULA QUINTA — DO PREÇO', texto: `Pagamento de ${valueFormatted}. Multa de ${contract.multa_atraso_pgto ?? 2}% em caso de atraso acima de 10 dias.` },
+        { id: 'c6', titulo: 'CLÁUSULA SEXTA — DO DESCUMPRIMENTO', texto: `Multa de ${contract.multa_descumprimento ?? 10}% sobre valor do contrato.` },
+        { id: 'c7', titulo: 'CLÁUSULA SÉTIMA — DO PRAZO', texto: 'Prazo indeterminado, vigendo até finalização do serviço.' },
+        { id: 'c8', titulo: 'CLÁUSULA OITAVA — DA RESCISÃO', texto: `Rescisão sem motivo com ${contract.prazo_rescisao_dias ?? 15} dias de antecedência.` },
+        { id: 'c9', titulo: 'CLÁUSULA NONA — DA LGPD', texto: 'Tratamento de dados conforme Art. 7º, V da LGPD.' },
+        { id: 'c10', titulo: 'CLÁUSULA DÉCIMA — AUSÊNCIA DE VÍNCULO', texto: 'Sem vínculo trabalhista, subordinação ou habitualidade.' },
+        { id: 'c11', titulo: 'CLÁUSULA DÉCIMA PRIMEIRA — DO FORO', texto: 'Foro da comarca de domicílio da CONTRATANTE.' },
+      ]
+    }
+
+    return []
+  }
+
+  function renumerarClausulas(lista: Clausula[]): Clausula[] {
+    return lista.map((c, idx) => {
+      const numero = idx + 1
+      // Remove qualquer numeração antiga do início do título (ex: "1.", "3ª", "CLÁUSULA QUINTA —", "ITEM 04 —")
+      const tituloLimpo = c.titulo
+        .replace(/^(\d+ª?\s*[-—.]?\s*)/i, '')
+        .replace(/^(cláusula\s+\w+\s*[-—]\s*)/i, '')
+        .replace(/^(item\s+\d+\s*[-—]\s*)/i, '')
+        .trim()
+      return {
+        ...c,
+        titulo: `${numero}. ${tituloLimpo}`,
+      }
+    })
+  }
+
   async function generatePDF(contract: Contract) {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
@@ -1817,6 +1985,130 @@ export default function ContratosPage() {
     doc.save(`contrato-prestacao-servicos-${prestador.name.toLowerCase().replace(/ /g, '-')}.pdf`)
   }
 
+async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Clausula[]) {
+  const doc = new jsPDF()
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const margin = 20
+  const contentWidth = pageWidth - margin * 2
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: perfil } = await supabase.from('user_profiles').select('*').eq('id', user!.id).single()
+
+  const property = contract.properties
+  const tenant = contract.tenants
+  const owner = property?.owners
+
+  const titles: Record<string, string> = {
+    rental: 'CONTRATO DE LOCAÇÃO RESIDENCIAL',
+    commercial: 'CONTRATO DE LOCAÇÃO COMERCIAL',
+    intermediacao: 'CONTRATO DE INTERMEDIAÇÃO IMOBILIÁRIA',
+    promessa_compra_venda: 'PROMESSA DE COMPRA E VENDA',
+    administracao: 'CONTRATO DE ADMINISTRAÇÃO DE IMÓVEIS',
+    exclusividade: 'CONTRATO DE EXCLUSIVIDADE',
+    compra_venda: 'CONTRATO DE COMPRA E VENDA',
+    servicos: 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS',
+  }
+
+  const addText = (text: string, y: number, indent = 0): number => {
+    if (y > 265) { doc.addPage(); y = 20 }
+    const lines = doc.splitTextToSize(text, contentWidth - indent)
+    doc.text(lines, margin + indent, y)
+    return y + lines.length * 5.5
+  }
+
+  let y = 20
+
+  // TÍTULO
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(13)
+  doc.text(titles[contract.type] ?? 'CONTRATO', pageWidth / 2, y, { align: 'center' })
+  y += 10
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5)
+
+  // PARTES
+  doc.setFont('helvetica', 'bold')
+  doc.text('PARTE 1:', margin, y); y += 6
+  doc.setFont('helvetica', 'normal')
+  if (owner?.name) {
+    y = addText(`${owner.name}${owner.cpf ? `, CPF nº ${owner.cpf}` : ''}${owner.address ? `, residente na ${owner.address}` : ''}.`, y, 4)
+  } else if (perfil?.full_name) {
+    y = addText(`${perfil.full_name}${perfil.cpf ? `, CPF nº ${perfil.cpf}` : ''}.`, y, 4)
+  }
+  y += 4
+
+  doc.setFont('helvetica', 'bold')
+  doc.text('PARTE 2:', margin, y); y += 6
+  doc.setFont('helvetica', 'normal')
+  if (tenant) {
+    y = addText(`${tenant.name}${tenant.cpf ? `, CPF nº ${tenant.cpf}` : ''}${tenant.phone ? `, telefone: ${tenant.phone}` : ''}.`, y, 4)
+  }
+  y += 4
+
+  if (contract.fiador_nome) {
+    doc.setFont('helvetica', 'bold')
+    doc.text('FIADOR(A):', margin, y); y += 6
+    doc.setFont('helvetica', 'normal')
+    y = addText(`${contract.fiador_nome}${contract.fiador_cpf ? `, CPF nº ${contract.fiador_cpf}` : ''}.`, y, 4)
+    y += 4
+  }
+
+  y = addText('As partes acima identificadas têm, entre si, justo e contratado o presente instrumento, que se regerá pelas cláusulas seguintes:', y)
+  y += 6
+
+  // CLÁUSULAS EDITÁVEIS
+  clausulasEditadas.forEach(c => {
+    if (y > 258) { doc.addPage(); y = 20 }
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    const tituloLines = doc.splitTextToSize(c.titulo, contentWidth)
+    doc.text(tituloLines, margin, y)
+    y += tituloLines.length * 5.5 + 2
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    y = addText(c.texto, y, 4)
+    y += 5
+  })
+
+  y += 6
+
+  // ASSINATURAS
+  if (y > 230) { doc.addPage(); y = 20 }
+  y = addText('E, assim, por estarem justas e contratadas, as partes assinam o presente instrumento em 02 (duas) vias de igual teor, na presença de 02 (duas) testemunhas.', y)
+  y += 4
+  y = addText(`[cidade/estado], ${new Date().toLocaleDateString('pt-BR')}.`, y)
+  y += 12
+
+  doc.line(margin, y, margin + 70, y)
+  doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+  y += 5
+  doc.setFontSize(9)
+  doc.text(owner?.name ?? perfil?.full_name ?? 'PARTE 1', margin + 35, y, { align: 'center' })
+  doc.text(tenant?.name ?? 'PARTE 2', pageWidth / 2 + 45, y, { align: 'center' })
+  y += 4
+  doc.setTextColor(120)
+  doc.text('PARTE 1', margin + 35, y, { align: 'center' })
+  doc.text('PARTE 2', pageWidth / 2 + 45, y, { align: 'center' })
+  doc.setTextColor(0)
+  y += 14
+
+  if (y > 255) { doc.addPage(); y = 20 }
+  doc.text('Testemunhas:', margin, y); y += 8
+  doc.line(margin, y, margin + 70, y)
+  doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
+  y += 5
+  doc.setTextColor(120)
+  doc.text('1. Nome: _______________  CPF: _______________', margin, y)
+  doc.text('2. Nome: _______________  CPF: _______________', pageWidth / 2 + 10, y)
+  doc.setTextColor(0)
+
+  doc.setFontSize(7)
+  doc.setTextColor(150)
+  doc.text('Gerado por ImobApp · imobapp.com.br', pageWidth / 2, 290, { align: 'center' })
+
+  doc.save(`contrato-personalizado-${(tenant?.name ?? 'contrato').toLowerCase().replace(/ /g, '-')}.pdf`)
+}
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
         <Sidebar />
@@ -2277,23 +2569,131 @@ export default function ContratosPage() {
                 </div>
                 <button
                   onClick={() => {
-                    if (c.type === 'intermediacao') generateIntermediacaoPDF(c)
-                    else if (c.type === 'promessa_compra_venda') generatePromessaPDF(c)
-                    else if (c.type === 'commercial') generateLocacaoComercialPDF(c)
-                    else if (c.type === 'administracao') generateAdministracaoPDF(c)
-                    else if (c.type === 'exclusividade') generateExclusividadePDF(c)
-                    else if (c.type === 'compra_venda') generateCompraVendaPDF(c)
-                    else if (c.type === 'servicos') generateServicosPDF(c)
-                    else generatePDF(c)
-                  }}
+                    setContractParaGerar(c)
+                    setClausulas(renumerarClausulas(montarClausulasPadrao(c)))
+                    setShowClausulasEditor(true)
+                  }}             
+                  // onClick={() => {
+                  //   if (c.type === 'intermediacao') generateIntermediacaoPDF(c)
+                  //   else if (c.type === 'promessa_compra_venda') generatePromessaPDF(c)
+                  //   else if (c.type === 'commercial') generateLocacaoComercialPDF(c)
+                  //   else if (c.type === 'administracao') generateAdministracaoPDF(c)
+                  //   else if (c.type === 'exclusividade') generateExclusividadePDF(c)
+                  //   else if (c.type === 'compra_venda') generateCompraVendaPDF(c)
+                  //   else if (c.type === 'servicos') generateServicosPDF(c)
+                  //   else generatePDF(c)
+                  // }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-2"
                 >
-                  ⬇ Baixar PDF
+                  ⬇ Revisar PDF
                 </button>
               </div>
             ))}
           </div>
         )}
+        {showClausulasEditor && contractParaGerar && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
+
+              <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-gray-900 text-lg">Editor de cláusulas</h3>
+                  <p className="text-sm text-gray-500">Revise e personalize antes de gerar o PDF</p>
+                </div>
+                <button onClick={() => setShowClausulasEditor(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+              </div>
+
+              <div className="p-5 overflow-y-auto flex-1 space-y-4">
+                {clausulas.map((c, idx) => {
+                  const match = c.titulo.match(/^(\d+\.\s*)(.*)$/)
+                  const numero = match ? match[1] : `${idx + 1}. `
+                  const nomeClausula = match ? match[2] : c.titulo
+
+                  return (
+                    <div key={c.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center flex-1 gap-1">
+                          <div className="flex flex-col -ml-1">
+                            <button
+                              disabled={idx === 0}
+                              onClick={() => {
+                                const novas = [...clausulas]
+                                  ;[novas[idx - 1], novas[idx]] = [novas[idx], novas[idx - 1]]
+                                setClausulas(renumerarClausulas(novas))
+                              }}
+                              className="text-gray-300 hover:text-gray-600 disabled:opacity-20 text-xs leading-none"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              disabled={idx === clausulas.length - 1}
+                              onClick={() => {
+                                const novas = [...clausulas]
+                                  ;[novas[idx], novas[idx + 1]] = [novas[idx + 1], novas[idx]]
+                                setClausulas(renumerarClausulas(novas))
+                              }}
+                              className="text-gray-300 hover:text-gray-600 disabled:opacity-20 text-xs leading-none"
+                            >
+                              ▼
+                            </button>
+                          </div>
+                          <span className="font-semibold text-sm text-gray-500 mr-1">{numero}</span>
+                          <input
+                            type="text"
+                            value={nomeClausula}
+                            onChange={e => {
+                              const novas = [...clausulas]
+                              novas[idx].titulo = `${numero}${e.target.value}`
+                              setClausulas(novas)
+                            }}
+                            className="font-semibold text-sm text-gray-900 border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 -ml-1 flex-1"
+                          />
+                        </div>
+                        <button
+                          onClick={() => setClausulas(renumerarClausulas(clausulas.filter(cl => cl.id !== c.id)))}
+                          className="text-gray-400 hover:text-red-500 text-sm ml-2"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>                  )
+                })}
+
+                <button
+                  onClick={() => {
+                    const novaLista = [...clausulas, {
+                      id: `extra-${Date.now()}`,
+                      titulo: 'NOVA CLÁUSULA',
+                      texto: 'Digite o texto da cláusula aqui...'
+                    }]
+                    setClausulas(renumerarClausulas(novaLista))
+                  }}
+                  className="w-full border-2 border-dashed border-gray-300 text-gray-500 rounded-lg py-3 text-sm hover:bg-gray-50 hover:border-gray-400"
+                >
+                  + Adicionar cláusula
+                </button>
+              </div>
+
+              <div className="p-5 border-t border-gray-200 flex gap-3">
+                <button
+                  onClick={async () => {
+                    await generatePDFComClausulas(contractParaGerar, clausulas)
+                    setShowClausulasEditor(false)
+                  }}
+                  className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700"
+                >
+                  ⬇ Gerar PDF com essas cláusulas
+                </button>
+                <button
+                  onClick={() => setShowClausulasEditor(false)}
+                  className="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg text-sm hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}       
       </main>
     </div>
   )
