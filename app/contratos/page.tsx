@@ -22,8 +22,8 @@ type Property = {
   name: string
   address: string
   rent_value: number
-  owner_id: string
-  owners: Owner | null
+  people_owner_id: string
+  people: Owner | null  // antes era 'owners'
 }
 
 type Tenant = {
@@ -47,7 +47,7 @@ type Contract = {
   fiador_rg: string
   fiador_endereco: string
   properties: Property
-  tenants: Tenant
+  people: Tenant
   comissao_valor: number | null
   comissao_percentual: number | null
   banco_nome: string | null
@@ -123,17 +123,19 @@ export default function ContratosPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const [{ data: c }, { data: p }, { data: t }] = await Promise.all([
-      supabase.from('contracts').select(`*,
-            properties(*, owners(*)),
-            tenants(*)`).order('created_at', { ascending: false }),
+    const [{ data: c }, { data: p }, { data: peopleList }] = await Promise.all([
+      supabase.from('contracts').select(`
+      *,
+      properties(*, people:people_owner_id(*)),
+      people:people_tenant_id(*)
+    `).order('created_at', { ascending: false }),
       supabase.from('properties').select('*'),
-      supabase.from('tenants').select('*'),
+      supabase.from('people').select('*'),
     ])
 
-    setContracts(c ?? [])
+    setContracts((c ?? []) as any)
     setProperties(p ?? [])
-    setTenants(t ?? [])
+    setTenants(peopleList ?? [])
     setLoading(false)
   }
 
@@ -192,7 +194,7 @@ export default function ContratosPage() {
     const { error } = await supabase.from('contracts').insert({
       user_id: user!.id,
       property_id: form.property_id,
-      tenant_id: form.tenant_id || null,
+      people_tenant_id: form.tenant_id || null,
       type: form.type,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
@@ -237,8 +239,8 @@ export default function ContratosPage() {
 
   function montarClausulasPadrao(contract: Contract): Clausula[] {
     const property = contract.properties
-    const tenant = contract.tenants
-    const owner = property?.owners
+    const tenant = contract.people
+    const owner = property?.people
     const startFormatted = contract.start_date ? new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '___/___/______'
     const endFormatted = contract.end_date ? new Date(contract.end_date + 'T12:00:00').toLocaleDateString('pt-BR') : 'indeterminado'
     const valueFormatted = contract.value?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? 'a definir'
@@ -401,8 +403,8 @@ export default function ContratosPage() {
     const contentWidth = pageWidth - margin * 2
 
     const property = contract.properties
-    const tenant = contract.tenants
-    const owner = property?.owners
+    const tenant = contract.people
+    const owner = property?.people
 
     const startFormatted = new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
     const endFormatted = contract.end_date
@@ -647,7 +649,7 @@ export default function ContratosPage() {
     const { data: perfil } = await supabase.from('user_profiles').select('*').eq('id', user!.id).single()
 
     const property = contract.properties
-    const owner = property?.owners
+    const owner = property?.people
     const contratada = perfil
 
     const comissaoTexto = contract.comissao_valor
@@ -801,8 +803,8 @@ export default function ContratosPage() {
     const contentWidth = pageWidth - margin * 2
 
     const property = contract.properties
-    const owner = property?.owners
-    const buyer = contract.tenants
+    const owner = property?.people
+    const buyer = contract.people
 
     const totalFormatted = contract.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
     const sinalFormatted = contract.sinal_valor
@@ -987,8 +989,8 @@ export default function ContratosPage() {
     const contentWidth = pageWidth - margin * 2
 
     const property = contract.properties
-    const tenant = contract.tenants
-    const owner = property?.owners
+    const tenant = contract.people
+    const owner = property?.people
 
     const startFormatted = contract.start_date
       ? new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
@@ -1225,7 +1227,7 @@ export default function ContratosPage() {
     const { data: perfil } = await supabase.from('user_profiles').select('*').eq('id', user!.id).single()
 
     const property = contract.properties
-    const owner = property?.owners
+    const owner = property?.people
     const contratada = perfil
 
     const startFormatted = contract.start_date
@@ -1422,7 +1424,7 @@ export default function ContratosPage() {
     const { data: perfil } = await supabase.from('user_profiles').select('*').eq('id', user!.id).single()
 
     const property = contract.properties
-    const owner = property?.owners
+    const owner = property?.people
     const contratado = perfil
 
     const startFormatted = contract.start_date
@@ -1647,8 +1649,8 @@ export default function ContratosPage() {
     const contentWidth = pageWidth - margin * 2
 
     const property = contract.properties
-    const owner = property?.owners
-    const buyer = contract.tenants
+    const owner = property?.people
+    const buyer = contract.people
 
     const totalFormatted = contract.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
     const dataAssinatura = contract.start_date
@@ -1825,7 +1827,7 @@ export default function ContratosPage() {
     const { data: { user } } = await supabase.auth.getUser()
     const { data: perfil } = await supabase.from('user_profiles').select('*').eq('id', user!.id).single()
 
-    const prestador = contract.tenants
+    const prestador = contract.people
     const contratante = perfil
 
     const dataAssinatura = contract.start_date
@@ -1995,8 +1997,8 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
   const { data: perfil } = await supabase.from('user_profiles').select('*').eq('id', user!.id).single()
 
   const property = contract.properties
-  const tenant = contract.tenants
-  const owner = property?.owners
+  const tenant = contract.people
+  const owner = property?.people
 
   const titles: Record<string, string> = {
     rental: 'CONTRATO DE LOCAÇÃO RESIDENCIAL',
@@ -2601,7 +2603,7 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
                     <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
                       {typeLabel[c.type]}
                     </span>
-                    <span className="text-sm font-semibold text-gray-900">{c.tenants?.name}</span>
+                    <span className="text-sm font-semibold text-gray-900">{c.people?.name}</span>
                   </div>
                   <p className="text-sm text-gray-500">{c.properties?.name} · {c.properties?.address}</p>
                   <p className="text-sm text-gray-500 mt-0.5">

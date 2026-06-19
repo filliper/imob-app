@@ -11,8 +11,8 @@ type Property = {
   address: string
   type: string
   rent_value: number
-  owner_id: string | null
-  owners?: { id: string; name: string } | null
+  people_owner_id: string | null
+  people?: { id: string; name: string } | null
 }
 
 type Owner = { id: string; name: string }
@@ -45,13 +45,12 @@ export default function ImoveisPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const [{ data: props }, { data: ownersList }] = await Promise.all([
-      supabase.from('properties').select('*, owners(id, name)').order('created_at', { ascending: false }),
-      supabase.from('owners').select('id, name'),
+    const [{ data: props }, { data: peopleList }] = await Promise.all([
+      supabase.from('properties').select('*, people:people_owner_id(id, name)').order('created_at', { ascending: false }),
+      supabase.from('people').select('id, name'),
     ])
-
     setProperties(props ?? [])
-    setOwners(ownersList ?? [])
+    setOwners(peopleList ?? [])
     setLoading(false)
   }
 
@@ -67,7 +66,7 @@ export default function ImoveisPage() {
       address: form.address,
       type: form.type,
       rent_value: parseFloat(form.rent_value),
-      owner_id: form.owner_id || null,
+      people_owner_id: form.owner_id || null,
     }
 
     if (editingId) {
@@ -89,18 +88,17 @@ export default function ImoveisPage() {
     loadProperties()
   }
 
-function startEdit(p: Property) {
-  setEditingId(p.id)
-  setForm({
-    name: p.name,
-    address: p.address,
-    type: p.type,
-    rent_value: p.rent_value.toString(),
-    owner_id: p.owner_id ?? '',
-  })
-  setShowForm(true)
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
+  function startEdit(p: Property) {
+    setEditingId(p.id)
+    setForm({
+      name: p.name, address: p.address, type: p.type,
+      rent_value: p.rent_value.toString(),
+      owner_id: p.people_owner_id ?? '',
+    })
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
 
@@ -220,9 +218,9 @@ function startEdit(p: Property) {
                       <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
                         {p.type === 'residential' ? 'Residencial' : 'Comercial'}
                       </span>
-                      {p.owners && (
+                      {p.people && (
                         <span className="text-xs text-blue-600 font-medium">
-                          👔 {p.owners.name}
+                          👔 {p.people.name}
                         </span>
                       )}
                       <span className="text-sm font-semibold text-green-600">
