@@ -2026,22 +2026,66 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9.5)
 
-  // PARTES
+  // Define os rótulos e quem é quem, conforme o tipo de contrato
+  const labels: Record<string, { parte1: string; parte2: string }> = {
+    rental: { parte1: 'LOCADOR', parte2: 'LOCATÁRIO' },
+    commercial: { parte1: 'LOCADOR', parte2: 'LOCATÁRIO' },
+    intermediacao: { parte1: 'CONTRATANTE', parte2: 'CONTRATADA' },
+    promessa_compra_venda: { parte1: 'VENDEDOR', parte2: 'COMPRADOR' },
+    administracao: { parte1: 'CONTRATANTE', parte2: 'CONTRATADA' },
+    exclusividade: { parte1: 'CONTRATANTE', parte2: 'CONTRATADO' },
+    compra_venda: { parte1: 'VENDEDOR', parte2: 'COMPRADOR' },
+    servicos: { parte1: 'CONTRATANTE', parte2: 'CONTRATADA' },
+  }
+  const rotulo = labels[contract.type] ?? { parte1: 'PARTE 1', parte2: 'PARTE 2' }
+
+  // Define quem preenche cada papel:
+  // - Contratos de locação/venda: PARTE 1 = proprietário do imóvel, PARTE 2 = inquilino/comprador
+  // - Intermediação/Administração/Exclusividade: PARTE 1 = proprietário (CONTRATANTE), PARTE 2 = você (CONTRATADA)
+  // - Serviços: PARTE 1 = você (CONTRATANTE), PARTE 2 = prestador de serviço (inquilino cadastrado)
+  const ehVoceQuemContrata = ['servicos'].includes(contract.type)
+  const ehVoceQuemEContratado = ['intermediacao', 'administracao', 'exclusividade'].includes(contract.type)
+
+  let dadosParte1: { nome: string; cpf?: string; rg?: string; endereco?: string; telefone?: string; email?: string } | null = null
+  let dadosParte2: { nome: string; cpf?: string; rg?: string; endereco?: string; telefone?: string; email?: string } | null = null
+
+  if (ehVoceQuemContrata) {
+    // Você é o CONTRATANTE, o "tenant" cadastrado é o prestador (CONTRATADA)
+    dadosParte1 = perfil?.full_name ? { nome: perfil.full_name, cpf: perfil.cpf, rg: perfil.rg, endereco: perfil.address, telefone: perfil.phone } : null
+    dadosParte2 = tenant ? { nome: tenant.name, cpf: tenant.cpf, telefone: tenant.phone, email: tenant.email } : null
+  } else if (ehVoceQuemEContratado) {
+    // Proprietário é o CONTRATANTE, você é a CONTRATADA
+    dadosParte1 = owner ? { nome: owner.name, cpf: owner.cpf, rg: owner.rg, endereco: owner.address, telefone: owner.phone, email: owner.email } : null
+    dadosParte2 = perfil?.full_name ? { nome: perfil.full_name, cpf: perfil.cpf, rg: perfil.rg, endereco: perfil.address, telefone: perfil.phone } : null
+  } else {
+    // Locação / Compra e venda: proprietário x inquilino/comprador
+    dadosParte1 = owner ? { nome: owner.name, cpf: owner.cpf, rg: owner.rg, endereco: owner.address, telefone: owner.phone, email: owner.email } : null
+    dadosParte2 = tenant ? { nome: tenant.name, cpf: tenant.cpf, telefone: tenant.phone, email: tenant.email } : null
+  }
+
+  // PARTE 1
   doc.setFont('helvetica', 'bold')
-  doc.text('PARTE 1:', margin, y); y += 6
+  doc.text(`${rotulo.parte1}:`, margin, y); y += 6
   doc.setFont('helvetica', 'normal')
-  if (owner?.name) {
-    y = addText(`${owner.name}${owner.cpf ? `, CPF nº ${owner.cpf}` : ''}${owner.address ? `, residente na ${owner.address}` : ''}.`, y, 4)
-  } else if (perfil?.full_name) {
-    y = addText(`${perfil.full_name}${perfil.cpf ? `, CPF nº ${perfil.cpf}` : ''}.`, y, 4)
+  if (dadosParte1?.nome) {
+    y = addText(`${dadosParte1.nome}${dadosParte1.cpf ? `, CPF nº ${dadosParte1.cpf}` : ''}${dadosParte1.rg ? `, RG nº ${dadosParte1.rg}` : ''}${dadosParte1.endereco ? `, residente na ${dadosParte1.endereco}` : ''}${dadosParte1.telefone ? `, telefone: ${dadosParte1.telefone}` : ''}${dadosParte1.email ? `, e-mail: ${dadosParte1.email}` : ''}.`, y, 4)
+  } else {
+    doc.setTextColor(150)
+    y = addText(ehVoceQuemContrata ? '(Preencha seus dados em "Meu Perfil")' : '(Proprietário não vinculado ao imóvel)', y, 4)
+    doc.setTextColor(0)
   }
   y += 4
 
+  // PARTE 2
   doc.setFont('helvetica', 'bold')
-  doc.text('PARTE 2:', margin, y); y += 6
+  doc.text(`${rotulo.parte2}:`, margin, y); y += 6
   doc.setFont('helvetica', 'normal')
-  if (tenant) {
-    y = addText(`${tenant.name}${tenant.cpf ? `, CPF nº ${tenant.cpf}` : ''}${tenant.phone ? `, telefone: ${tenant.phone}` : ''}.`, y, 4)
+  if (dadosParte2?.nome) {
+    y = addText(`${dadosParte2.nome}${dadosParte2.cpf ? `, CPF nº ${dadosParte2.cpf}` : ''}${dadosParte2.rg ? `, RG nº ${dadosParte2.rg}` : ''}${dadosParte2.endereco ? `, residente na ${dadosParte2.endereco}` : ''}${dadosParte2.telefone ? `, telefone: ${dadosParte2.telefone}` : ''}${dadosParte2.email ? `, e-mail: ${dadosParte2.email}` : ''}.`, y, 4)
+  } else {
+    doc.setTextColor(150)
+    y = addText(ehVoceQuemEContratado ? '(Preencha seus dados em "Meu Perfil")' : '(Selecione um inquilino/comprador no contrato)', y, 4)
+    doc.setTextColor(0)
   }
   y += 4
 
@@ -2083,12 +2127,12 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
   doc.line(pageWidth / 2 + 10, y, pageWidth - margin, y)
   y += 5
   doc.setFontSize(9)
-  doc.text(owner?.name ?? perfil?.full_name ?? 'PARTE 1', margin + 35, y, { align: 'center' })
-  doc.text(tenant?.name ?? 'PARTE 2', pageWidth / 2 + 45, y, { align: 'center' })
+  doc.text(dadosParte1?.nome ?? rotulo.parte1, margin + 35, y, { align: 'center' })
+  doc.text(dadosParte2?.nome ?? rotulo.parte2, pageWidth / 2 + 45, y, { align: 'center' })
   y += 4
   doc.setTextColor(120)
-  doc.text('PARTE 1', margin + 35, y, { align: 'center' })
-  doc.text('PARTE 2', pageWidth / 2 + 45, y, { align: 'center' })
+  doc.text(rotulo.parte1, margin + 35, y, { align: 'center' })
+  doc.text(rotulo.parte2, pageWidth / 2 + 45, y, { align: 'center' })
   doc.setTextColor(0)
   y += 14
 
@@ -2613,8 +2657,9 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
                     <div key={c.id} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center flex-1 gap-1">
-                          <div className="flex flex-col -ml-1">
+                          <div className="flex flex-col -ml-1 mr-1">
                             <button
+                              type="button"
                               disabled={idx === 0}
                               onClick={() => {
                                 const novas = [...clausulas]
@@ -2626,6 +2671,7 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
                               ▲
                             </button>
                             <button
+                              type="button"
                               disabled={idx === clausulas.length - 1}
                               onClick={() => {
                                 const novas = [...clausulas]
@@ -2637,29 +2683,45 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
                               ▼
                             </button>
                           </div>
-                          <span className="font-semibold text-sm text-gray-500 mr-1">{numero}</span>
+                          <span className="font-semibold text-sm text-gray-500">{numero}</span>
                           <input
                             type="text"
                             value={nomeClausula}
                             onChange={e => {
-                              const novas = [...clausulas]
-                              novas[idx].titulo = `${numero}${e.target.value}`
+                              const novas = clausulas.map((cl, i) =>
+                                i === idx ? { ...cl, titulo: `${numero}${e.target.value}` } : cl
+                              )
                               setClausulas(novas)
                             }}
-                            className="font-semibold text-sm text-gray-900 border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 -ml-1 flex-1"
+                            className="font-semibold text-sm text-gray-900 border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 flex-1"
                           />
                         </div>
                         <button
+                          type="button"
                           onClick={() => setClausulas(renumerarClausulas(clausulas.filter(cl => cl.id !== c.id)))}
                           className="text-gray-400 hover:text-red-500 text-sm ml-2"
                         >
                           🗑️
                         </button>
                       </div>
-                    </div>                  )
+                      <textarea
+                        value={c.texto}
+                        onChange={e => {
+                          const novoTexto = e.target.value
+                          const novas = clausulas.map((cl, i) =>
+                            i === idx ? { ...cl, texto: novoTexto } : cl
+                          )
+                          setClausulas(novas)
+                        }}
+                        rows={3}
+                        className="w-full text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                      />
+                    </div>
+                  )
                 })}
 
                 <button
+                  type="button"
                   onClick={() => {
                     const novaLista = [...clausulas, {
                       id: `extra-${Date.now()}`,
