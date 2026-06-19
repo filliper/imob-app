@@ -57,6 +57,11 @@ type Contract = {
   sinal_valor: any
   parcelas_valor: any
   parcelas_quantidade: any
+  servico_descricao?: string | null
+  servico_prazo_inicio?: number | null
+  multa_atraso_pgto?: number | null
+  multa_descumprimento?: number | null
+  prazo_rescisao_dias?: number | null
 }
 
 export default function ContratosPage() {
