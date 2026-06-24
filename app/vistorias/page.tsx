@@ -166,88 +166,213 @@ export default function VistoriasPage() {
     setChecklist(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i))
   }
 
-  function gerarPDF(v: Vistoria) {
-    const doc = new jsPDF()
-    const pageWidth = doc.internal.pageSize.getWidth()
+  async function gerarPDF(v: Vistoria) {
+    // Get the button that triggered this to show loading state
+    const triggerElement = event?.currentTarget as HTMLButtonElement | null
+    if (triggerElement) {
+      triggerElement.disabled = true
+      const originalContent = triggerElement.innerHTML
+      triggerElement.innerHTML = 'Gerando...'
 
-    doc.setFontSize(18)
-    doc.setFont('helvetica', 'bold')
-    doc.text('RELATÓRIO DE VISTORIA', pageWidth / 2, 25, { align: 'center' })
-
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(100)
-    doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} pelo ImobApp`, pageWidth / 2, 33, { align: 'center' })
-    doc.setTextColor(0)
-
-    doc.setDrawColor(200)
-    doc.line(20, 38, 190, 38)
-
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.text('DADOS DA VISTORIA', 20, 48)
-
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Imóvel: ${v.properties?.name}`, 20, 57)
-    doc.text(`Endereço: ${v.properties?.address}`, 20, 64)
-    doc.text(`Tipo: ${v.type === 'entrada' ? 'Entrada' : 'Saída'}`, 20, 71)
-    doc.text(`Data: ${new Date(v.scheduled_date + 'T12:00:00').toLocaleDateString('pt-BR')}`, 20, 78)
-    doc.text(`Status: ${v.status === 'concluida' ? 'Concluída' : 'Agendada'}`, 20, 85)
-
-    doc.line(20, 91, 190, 91)
-
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    doc.text('CHECKLIST', 20, 101)
-
-    let y = 110
-    const items = v.checklist ?? []
-    let comodoAtual = ''
-
-    items.forEach(item => {
-      if (y > 260) { doc.addPage(); y = 20 }
-
-      if (item.comodo !== comodoAtual) {
-        comodoAtual = item.comodo
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(11)
-        doc.text(item.comodo.toUpperCase(), 20, y)
-        y += 7
+      try {
+        await generatePdfContent(v, triggerElement, originalContent)
+      } catch (error) {
+        console.error('Error generating PDF:', error)
+        alert('Erro ao gerar PDF: ' + (error instanceof Error ? error.message : 'Erro desconhecido'))
+        // Reset button state on error
+        triggerElement.disabled = false
+        triggerElement.innerHTML = originalContent
       }
+    } else {
+      // Fallback if we can't access the target element
+      await generatePdfContent(v, null, '')
+    }
+  }
 
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      doc.text(`• ${item.item}:`, 24, y)
+  async function generatePdfContent(v: Vistoria, triggerElement: HTMLButtonElement | null, originalContent: string) {
+    try {
+      const doc = new jsPDF()
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
 
-      const estadoLabel: Record<string, string> = {
-        otimo: 'Ótimo', bom: 'Bom', regular: 'Regular', ruim: 'Ruim', '': 'Não avaliado'
-      }
+      doc.setFontSize(18)
       doc.setFont('helvetica', 'bold')
-      doc.text(estadoLabel[item.estado] ?? '-', 130, y)
+      doc.text('RELATÓRIO DE VISTORIA', pageWidth / 2, 25, { align: 'center' })
+
+      doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
+      doc.setTextColor(100)
+      doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} pelo ImobApp`, pageWidth / 2, 33, { align: 'center' })
+      doc.setTextColor(0)
 
-      if (item.observacao) {
-        y += 5
-        doc.setTextColor(100)
-        doc.text(`  Obs: ${item.observacao}`, 24, y)
-        doc.setTextColor(0)
+      doc.setDrawColor(200)
+      doc.line(20, 38, 190, 38)
+
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.text('DADOS DA VISTORIA', 20, 48)
+
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Imóvel: ${v.properties?.name}`, 20, 57)
+      doc.text(`Endereço: ${v.properties?.address}`, 20, 64)
+      doc.text(`Tipo: ${v.type === 'entrada' ? 'Entrada' : 'Saída'}`, 20, 71)
+      doc.text(`Data: ${new Date(v.scheduled_date + 'T12:00:00').toLocaleDateString('pt-BR')}`, 20, 78)
+      doc.text(`Status: ${v.status === 'concluida' ? 'Concluída' : 'Agendada'}`, 20, 85)
+
+      doc.line(20, 91, 190, 91)
+
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.text('CHECKLIST', 20, 101)
+
+      let y = 110
+      const items = v.checklist ?? []
+      let comodoAtual = ''
+
+      // Pre-load all images
+      const imageCache: Map<string, string> = new Map()
+
+      const loadImage = async (url: string): Promise<string> => {
+        if (imageCache.has(url)) {
+          return imageCache.get(url)!
+        }
+
+        try {
+          const response = await fetch(url)
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+          const blob = await response.blob()
+          const reader = new FileReader()
+
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onloadend = () => {
+              const imgData = reader.result as string
+              resolve(imgData)
+            }
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+          })
+
+          imageCache.set(url, base64)
+          return base64
+        } catch (error) {
+          console.warn('Failed to load image:', url, error)
+          return '' // Return empty string to indicate failure
+        }
       }
-      y += 7
-    })
 
-    y += 10
-    doc.line(20, y, 190, y)
-    y += 10
-    doc.setFontSize(10)
-    doc.text('Assinatura do Vistoriador', 60, y + 15, { align: 'center' })
-    doc.text('Assinatura do Inquilino', 145, y + 15, { align: 'center' })
+      // Process each checklist item
+      for (const item of items) {
+        // Check if we need a new page
+        if (y > 260) {
+          doc.addPage()
+          y = 20
+        }
 
-    doc.setFontSize(8)
-    doc.setTextColor(150)
-    doc.text('Gerado por ImobApp · imobapp.com.br', pageWidth / 2, 285, { align: 'center' })
+        if (item.comodo !== comodoAtual) {
+          comodoAtual = item.comodo
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(11)
+          doc.text(item.comodo.toUpperCase(), 20, y)
+          y += 7
+        }
 
-    doc.save(`vistoria-${v.type}-${v.scheduled_date}.pdf`)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(10)
+        doc.text(`• ${item.item}:`, 24, y)
+
+        const estadoLabel: Record<string, string> = {
+          otimo: 'Ótimo', bom: 'Bom', regular: 'Regular', ruim: 'Ruim', '': 'Não avaliado'
+        }
+        doc.setFont('helvetica', 'bold')
+        doc.text(estadoLabel[item.estado] ?? '-', 130, y)
+        doc.setFont('helvetica', 'normal')
+
+        if (item.observacao) {
+          y += 5
+          doc.setTextColor(100)
+          doc.text(`  Obs: ${item.observacao}`, 24, y)
+          doc.setTextColor(0)
+        }
+        y += 7
+
+        // Add photos if present
+        if (item.fotos && item.fotos.length > 0) {
+          // Load all images for this item
+          const imageDataPromises = item.fotos.map(url => loadImage(url))
+          const imageDataArray = await Promise.all(imageDataPromises)
+
+          // Calculate layout for images
+          const startX = 20
+          const maxImgWidth = 35
+          const maxImgHeight = 25
+          const padding = 4
+          let xOffset = startX
+          let imagesInRow = 0
+          let maxHeightInRow = 0
+
+          for (let i = 0; i < imageDataArray.length; i++) {
+            const imgData = imageDataArray[i]
+
+            if (!imgData) {
+              // Skip failed images
+              continue
+            }
+
+            // Check if we need to wrap to next line
+            if (xOffset + maxImgWidth > 180 && imagesInRow > 0) {
+              xOffset = startX
+              y += maxHeightInRow + padding
+              imagesInRow = 0
+              maxHeightInRow = 0
+
+              // Check if we need a new page
+              if (y > 260) {
+                doc.addPage()
+                y = 20
+                xOffset = startX
+              }
+            }
+
+            try {
+              // Add image to PDF
+              doc.addImage(imgData, 'JPEG', xOffset, y, maxImgWidth, maxImgHeight)
+              xOffset += maxImgWidth + padding
+              imagesInRow++
+              maxHeightInRow = Math.max(maxHeightInRow, maxImgHeight)
+            } catch (error) {
+              console.error('Error adding image to PDF:', error)
+              // Continue with other images
+            }
+          }
+
+          // Move y position down after images
+          if (imageDataArray.some(data => data !== '')) {
+            y += maxHeightInRow + padding + 5 // Extra space after images
+          }
+        }
+        y += 7 // Extra space after item
+      }
+
+      y += 10
+      doc.line(20, y, 190, y)
+      y += 10
+      doc.setFontSize(10)
+      doc.text('Assinatura do Vistoriador', 60, y + 15, { align: 'center' })
+      doc.text('Assinatura do Inquilino', 145, y + 15, { align: 'center' })
+
+      doc.setFontSize(8)
+      doc.setTextColor(150)
+      doc.text('Gerado por ImobApp · imobapp.com.br', pageWidth / 2, 285, { align: 'center' })
+
+      doc.save(`vistoria-${v.type}-${v.scheduled_date}.pdf`)
+    } finally {
+      // Reset button state if we have a trigger element
+      if (triggerElement) {
+        triggerElement.disabled = false
+        triggerElement.innerHTML = originalContent
+      }
+    }
   }
 
   const comodos = [...new Set(checklist.map(i => i.comodo))]
