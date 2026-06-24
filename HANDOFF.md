@@ -360,15 +360,11 @@ Destaque automático da página ativa via `usePathname()`.
 
 1. **Typo no nome do imóvel:** "Apto 101- Cantro" (digitado errado no cadastro de teste). Corrigir manualmente no Supabase ou via interface de edição.
 
-2. **Migração concluída:** Todas as páginas agora usam exclusivamente `people_owner_id` e `people_tenant_id`. As tabelas legadas `owners` e `tenants` ainda existem no banco de dados mas não são mais utilizadas pelo frontend. Recomenda-se removê-las em uma futura limpeza do banco.
+2. **Migração concluída:** Todas as páginas agora usam exclusivamente `people_owner_id` e `people_tenant_id`. As tabelas legadas `owners` e `tenants` foram removidas do banco de dados.
 
-3. **Editor de cláusulas — renumeração parcial:** Alguns títulos de cláusulas vindos das funções legadas têm formato misto (ex: "CLÁUSULA SÉTIMA — DO PRAZO", "ITEM 04 —"). O regex de limpeza em `renumerarClausulas()` pode não capturar todos os formatos. Verificar e ajustar o regex se necessário.
+3. **Editor de cláusulas — renomeração correta:** O regex de limpeza em `renumerarClausulas()` foi ajustado para capturar todos os formatos de cláusulas legadas (ex: "CLÁUSULA SÉTIMA — DO PRAZO", "ITEM 04 —").
 
-4. **PDF do editor de cláusulas vs PDF direto:** Existem dois caminhos para gerar PDF:
-   - **Botão "Baixar PDF"** → abre editor → `generatePDFComClausulas()` (genérico)
-   - As funções originais (`generatePDF`, `generateServicosPDF`, etc.) ainda existem mas não são chamadas pelo fluxo atual
-   - O PDF via editor tem cabeçalho/partes mais simples que os PDFs originais
-   - **Decisão pendente:** unificar os dois caminhos ou manter os dois
+4. **PDF do editor de cláusulas vs PDF direto:** Os dois caminhos foram unificados — o editor de cláusulas agora gera PDFs com o mesmo cabeçalho detalhado e estrutura das funções originais (`generatePDF`, `generateServicosPDF`, etc.).
 
 5. **Contrato de Compra e Venda:** modelo foi atualizado para "Compra e Venda de Bem Móvel" mas o sistema é imobiliário. Verificar se o modelo correto foi aplicado ou se precisa ajuste.
 
@@ -395,8 +391,8 @@ Destaque automático da página ativa via `usePathname()`.
 ### Prioridade Alta
 - [x] Finalizar migração: garantir que `/contratos` e `/imoveis` usam exclusivamente `people_owner_id` e `people_tenant_id`
 - [x] Remover referências a `owners` e `tenants` das queries de contratos
-- [ ] Unificar o gerador de PDF (editor de cláusulas deve usar o mesmo cabeçalho detalhado dos PDFs originais)
-- [ ] Corrigir regex de renumeração de cláusulas para todos os formatos
+- [x] Unificar o gerador de PDF (editor de cláusulas deve usar o mesmo cabeçalho detalhado dos PDFs originais)
+- [x] Corrigir regex de renumeração de cláusulas para todos os formatos
 
 ### Prioridade Média
 - [ ] Upload de fotos nas vistorias (Supabase Storage já configurado)

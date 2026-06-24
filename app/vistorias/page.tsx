@@ -14,6 +14,7 @@ type ChecklistItem = {
   item: string
   estado: 'otimo' | 'bom' | 'regular' | 'ruim' | ''
   observacao: string
+  fotos: string[]  // Array of photo URLs from Supabase Storage
 }
 
 type Vistoria = {
@@ -26,20 +27,20 @@ type Vistoria = {
 }
 
 const CHECKLIST_PADRAO: Omit<ChecklistItem, 'estado' | 'observacao'>[] = [
-  { id: '1', comodo: 'Sala',    item: 'Paredes e teto' },
-  { id: '2', comodo: 'Sala',    item: 'Piso' },
-  { id: '3', comodo: 'Sala',    item: 'Portas e janelas' },
-  { id: '4', comodo: 'Cozinha', item: 'Paredes e teto' },
-  { id: '5', comodo: 'Cozinha', item: 'Piso' },
-  { id: '6', comodo: 'Cozinha', item: 'Pia e torneira' },
-  { id: '7', comodo: 'Banheiro', item: 'Paredes e teto' },
-  { id: '8', comodo: 'Banheiro', item: 'Vaso e descarga' },
-  { id: '9', comodo: 'Banheiro', item: 'Chuveiro' },
-  { id: '10', comodo: 'Quarto',  item: 'Paredes e teto' },
-  { id: '11', comodo: 'Quarto',  item: 'Piso' },
-  { id: '12', comodo: 'Quarto',  item: 'Portas e janelas' },
-  { id: '13', comodo: 'Área',    item: 'Paredes' },
-  { id: '14', comodo: 'Área',    item: 'Piso' },
+  { id: '1', comodo: 'Sala',    item: 'Paredes e teto', fotos: [] },
+  { id: '2', comodo: 'Sala',    item: 'Piso', fotos: [] },
+  { id: '3', comodo: 'Sala',    item: 'Portas e janelas', fotos: [] },
+  { id: '4', comodo: 'Cozinha', item: 'Paredes e teto', fotos: [] },
+  { id: '5', comodo: 'Cozinha', item: 'Piso', fotos: [] },
+  { id: '6', comodo: 'Cozinha', item: 'Pia e torneira', fotos: [] },
+  { id: '7', comodo: 'Banheiro', item: 'Paredes e teto', fotos: [] },
+  { id: '8', comodo: 'Banheiro', item: 'Vaso e descarga', fotos: [] },
+  { id: '9', comodo: 'Banheiro', item: 'Chuveiro', fotos: [] },
+  { id: '10', comodo: 'Quarto',  item: 'Paredes e teto', fotos: [] },
+  { id: '11', comodo: 'Quarto',  item: 'Piso', fotos: [] },
+  { id: '12', comodo: 'Quarto',  item: 'Portas e janelas', fotos: [] },
+  { id: '13', comodo: 'Área',    item: 'Paredes', fotos: [] },
+  { id: '14', comodo: 'Área',    item: 'Piso', fotos: [] },
 ]
 
 const estadoCores: Record<string, string> = {
@@ -104,7 +105,12 @@ export default function VistoriasPage() {
   }
 
   function abrirChecklist(v: Vistoria) {
-    setChecklist(v.checklist ?? CHECKLIST_PADRAO.map(i => ({ ...i, estado: '', observacao: '' })))
+    // Ensure existing checklist items have fotos array
+    const checklistWithFotos = (v.checklist ?? []).map(item => ({
+      ...item,
+      fotos: Array.isArray(item.fotos) ? item.fotos : []
+    }));
+    setChecklist(checklistWithFotos.length > 0 ? checklistWithFotos : CHECKLIST_PADRAO.map(i => ({ ...i, estado: '', observacao: '', fotos: [] })));
     setShowChecklist(v.id)
   }
 
@@ -114,7 +120,49 @@ export default function VistoriasPage() {
     loadAll()
   }
 
-  function updateItem(id: string, field: 'estado' | 'observacao', value: string) {
+  async function uploadFile(file: File): Promise<string> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    // Create a unique filename
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Math.random().toString(36).substring(2, 15)}${Date.now()}.${fileExt}`
+    const filePath = `${user.id}/${fileName}`
+
+    // Upload to Supabase Storage
+    const { error } = await supabase.storage
+      .from('vistoria-fotos')
+      .upload(filePath, file)
+
+    if (error) {
+      throw error
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('vistoria-fotos')
+      .getPublicUrl(filePath)
+
+    return publicUrl
+  }
+
+  async function addPhotoToItem(itemId: string, file: File) {
+    try {
+      const url = await uploadFile(file)
+      setChecklist(prev =>
+        prev.map(item =>
+          item.id === itemId
+            ? { ...item, fotos: [...item.fotos, url] }
+            : item
+        )
+      )
+    } catch (error) {
+      console.error('Error uploading file:', error)
+      alert('Erro ao fazer upload da foto: ' + (error instanceof Error ? error.message : 'Erro desconhecido'))
+    }
+  }
+
+  function updateItem<T extends keyof ChecklistItem>(id: string, field: T, value: ChecklistItem[T]) {
     setChecklist(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i))
   }
 
@@ -284,6 +332,51 @@ export default function VistoriasPage() {
                         onChange={e => updateItem(item.id, 'observacao', e.target.value)}
                         placeholder="Observação (opcional)"
                         className="w-full text-sm border border-gray-200 rounded px-2 py-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                      </div>
+
+                      {/* Foto upload */}
+                      <div className="mt-2">
+                        <label className="text-xs font-medium text-gray-600 block mb-1">Fotos (máx. 5)</label>
+                        <div className="flex flex-wrap gap-2">
+                          {item.fotos.map((url, index) => (
+                            <div key={index} className="relative w-16 h-16">
+                              <img src={url} alt="vistoria" className="w-full h-full object-cover rounded border border-gray-200" />
+                              <button onClick={() =>
+                                updateItem(item.id, 'fotos', item.fotos.filter((_, i) => i !== index))
+                              } className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600">
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                          {item.fotos.length < 5 && (
+                            <label
+                              htmlFor={`photo-upload-${item.id}`}
+                              className={`w-16 h-16 flex items-center justify-center border-2 border-dashed border-gray-300 rounded hover:border-gray-400 cursor-pointer transition-colors`}
+                            >
+                              <input
+                                id={`photo-upload-${item.id}`}
+                                type="file"
+                                accept="image/*"
+                                multiple={false}
+                                style={{ display: 'none' }}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0]
+                                  if (file) {
+                                    addPhotoToItem(item.id, file)
+                                    e.target.value = '' // Reset input
+                                  }
+                                }}
+                              />
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                              </svg>
+                            </label>
+                          )}
+                        </div>
+                        {item.fotos.length >= 5 && (
+                          <p className="mt-1 text-xs text-red-600">Limite máximo de 5 fotos atingido</p>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
