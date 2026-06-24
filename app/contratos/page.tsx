@@ -2001,16 +2001,16 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
   const tenant = contract.people
   const owner = property?.people
 
-  const titles: Record<string, string> = {
-    rental: 'CONTRATO DE LOCAÇÃO RESIDENCIAL',
-    commercial: 'CONTRATO DE LOCAÇÃO COMERCIAL',
-    intermediacao: 'CONTRATO DE INTERMEDIAÇÃO IMOBILIÁRIA',
-    promessa_compra_venda: 'PROMESSA DE COMPRA E VENDA',
-    administracao: 'CONTRATO DE ADMINISTRAÇÃO DE IMÓVEIS',
-    exclusividade: 'CONTRATO DE EXCLUSIVIDADE',
-    compra_venda: 'CONTRATO DE COMPRA E VENDA',
-    servicos: 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS',
-  }
+  const startFormatted = contract.start_date
+    ? new Date(contract.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
+    : '___/___/______'
+  const endFormatted = contract.end_date
+    ? new Date(contract.end_date + 'T12:00:00').toLocaleDateString('pt-BR')
+    : 'indeterminado'
+  const valueFormatted = contract.value?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || 'a combinar'
+  const indice = contract.indice_reajuste ?? 'IPCA/IBGE'
+  const multa = contract.multa_rescisao ?? '3'
+  const multaExt = multa === '1' ? 'um' : multa === '2' ? 'dois' : 'três'
 
   const addText = (text: string, y: number, indent = 0): number => {
     if (y > 265) { doc.addPage(); y = 20 }
@@ -2019,12 +2019,43 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
     return y + lines.length * 5.5
   }
 
+  const addSection = (title: string, y: number): number => {
+    if (y > 260) { doc.addPage(); y = 20 }
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text(title, margin, y)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9.5)
+    return y + 7
+  }
+
+  const addItem = (text: string, y: number): number => {
+    if (y > 265) { doc.addPage(); y = 20 }
+    const lines = doc.splitTextToSize(text, contentWidth - 6)
+    doc.text(lines, margin + 6, y)
+    return y + lines.length * 5.5 + 1
+  }
+
   let y = 20
 
   // TÍTULO
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(13)
-  doc.text(titles[contract.type] ?? 'CONTRATO', pageWidth / 2, y, { align: 'center' })
+  doc.setFontSize(12)
+  doc.text('INSTRUMENTO PARTICULAR DE CONTRATO', pageWidth / 2, y, { align: 'center' })
+  y += 6
+
+  // Define o título específico baseado no tipo de contrato
+  const contractTitles: Record<string, string> = {
+    rental: 'DE LOCAÇÃO RESIDENCIAL',
+    commercial: 'DE LOCAÇÃO COMERCIAL',
+    intermediacao: 'DE INTERMEDIAÇÃO IMOBILIÁRIA',
+    promessa_compra_venda: 'DE PROMESSA DE COMPRA E VENDA',
+    administracao: 'DE ADMINISTRAÇÃO DE IMÓVEIS',
+    exclusividade: 'DE EXCLUSIVIDADE',
+    compra_venda: 'DE COMPRA E VENDA',
+    servicos: 'DE PRESTAÇÃO DE SERVIÇOS',
+  }
+  doc.text(contractTitles[contract.type] || '', pageWidth / 2, y, { align: 'center' })
   y += 10
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9.5)
@@ -2066,55 +2097,92 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
     dadosParte2 = tenant ? { nome: tenant.name, cpf: tenant.cpf, telefone: tenant.phone, email: tenant.email } : null
   }
 
-  // PARTE 1
+  // ── PREÂMBULO ──
+  y = addText('Pelo presente instrumento particular de contrato e na melhor forma de Direito, as partes abaixo qualificadas:', y)
+  y += 4
+
+  // ── PARTE 1 ──
   doc.setFont('helvetica', 'bold')
-  doc.text(`${rotulo.parte1}:`, margin, y); y += 6
+  doc.setFontSize(10)
+  doc.text(`${rotulo.parte1}`, margin, y)
+  y += 6
   doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5)
+
   if (dadosParte1?.nome) {
-    y = addText(`${dadosParte1.nome}${dadosParte1.cpf ? `, CPF nº ${dadosParte1.cpf}` : ''}${dadosParte1.rg ? `, RG nº ${dadosParte1.rg}` : ''}${dadosParte1.endereco ? `, residente na ${dadosParte1.endereco}` : ''}${dadosParte1.telefone ? `, telefone: ${dadosParte1.telefone}` : ''}${dadosParte1.email ? `, e-mail: ${dadosParte1.email}` : ''}.`, y, 4)
+    y = addItem(`${dadosParte1.nome}${dadosParte1.cpf ? `, CPF nº ${dadosParte1.cpf}` : ''}${dadosParte1.rg ? `, RG nº ${dadosParte1.rg}` : ''}${dadosParte1.endereco ? `, residente na ${dadosParte1.endereco}` : ''}${dadosParte1.telefone ? `, telefone: ${dadosParte1.telefone}` : ''}${dadosParte1.email ? `, e-mail: ${dadosParte1.email}` : ''}.`, y)
   } else {
     doc.setTextColor(150)
-    y = addText(ehVoceQuemContrata ? '(Preencha seus dados em "Meu Perfil")' : '(Proprietário não vinculado ao imóvel)', y, 4)
+    y = addItem(ehVoceQuemContrata ? '(Preencha seus dados em "Meu Perfil")' : '(Proprietário não vinculado ao imóvel)', y)
     doc.setTextColor(0)
   }
   y += 4
 
-  // PARTE 2
+  // ── PARTE 2 ──
   doc.setFont('helvetica', 'bold')
-  doc.text(`${rotulo.parte2}:`, margin, y); y += 6
+  doc.setFontSize(10)
+  doc.text(`${rotulo.parte2}`, margin, y)
+  y += 6
   doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5)
+
   if (dadosParte2?.nome) {
-    y = addText(`${dadosParte2.nome}${dadosParte2.cpf ? `, CPF nº ${dadosParte2.cpf}` : ''}${dadosParte2.rg ? `, RG nº ${dadosParte2.rg}` : ''}${dadosParte2.endereco ? `, residente na ${dadosParte2.endereco}` : ''}${dadosParte2.telefone ? `, telefone: ${dadosParte2.telefone}` : ''}${dadosParte2.email ? `, e-mail: ${dadosParte2.email}` : ''}.`, y, 4)
+    y = addItem(`${dadosParte2.nome}${dadosParte2.cpf ? `, CPF nº ${dadosParte2.cpf}` : ''}${dadosParte2.rg ? `, RG nº ${dadosParte2.rg}` : ''}${dadosParte2.endereco ? `, residente na ${dadosParte2.endereco}` : ''}${dadosParte2.telefone ? `, telefone: ${dadosParte2.telefone}` : ''}${dadosParte2.email ? `, e-mail: ${dadosParte2.email}` : ''}.`, y)
   } else {
     doc.setTextColor(150)
-    y = addText(ehVoceQuemEContratado ? '(Preencha seus dados em "Meu Perfil")' : '(Selecione um inquilino/comprador no contrato)', y, 4)
+    y = addItem(ehVoceQuemEContratado ? '(Preencha seus dados em "Meu Perfil")' : '(Selecione um inquilino/comprador no contrato)', y)
     doc.setTextColor(0)
   }
   y += 4
 
   if (contract.fiador_nome) {
     doc.setFont('helvetica', 'bold')
-    doc.text('FIADOR(A):', margin, y); y += 6
+    doc.setFontSize(10)
+    doc.text('FIADOR(A):', margin, y)
+    y += 6
     doc.setFont('helvetica', 'normal')
-    y = addText(`${contract.fiador_nome}${contract.fiador_cpf ? `, CPF nº ${contract.fiador_cpf}` : ''}.`, y, 4)
+    doc.setFontSize(9.5)
+    y = addItem(`${contract.fiador_nome}${contract.fiador_cpf ? `, CPF nº ${contract.fiador_cpf}` : ''}.`, y)
     y += 4
   }
 
-  y = addText('As partes acima identificadas têm, entre si, justo e contratado o presente instrumento, que se regerá pelas cláusulas seguintes:', y)
   y += 6
 
-  // CLÁUSULAS EDITÁVEIS
-  clausulasEditadas.forEach(c => {
-    if (y > 258) { doc.addPage(); y = 20 }
+  // NÚMEROS DAS CLÁUSULAS
+  const clausulasNumeradas = clausulasEditadas.map((clausula, index) => {
+    const numero = index + 1
+    // Remove qualquer numeração antiga do início do título
+    const tituloLimpo = clausula.titulo
+      .replace(/^(\d+ª?\s*[-—.]?\s*)/i, '')
+      .replace(/^(cláusula\s+\w+\s*[-—]\s*)/i, '')
+      .replace(/^(item\s+\d+\s*[-—]\s*)/i, '')
+      .replace(/^(primeira|segunda|terceira|quarta|quinta|sexta|sétima|oitava|nona|décima)\s*[-—]?\s*/i, '')
+      .trim()
+    return {
+      ...clausula,
+      titulo: `${numero}. ${tituloLimpo}`,
+      texto: clausula.texto
+    }
+  })
+
+  // SEÇÃO DAS CLÁUSULAS (equivalente à seção 3. DO PRAZO nos contratos específicos)
+  y = addSection('3. DAS CLÁUSULAS CONTRATUAIS', y)
+
+  // ADICIONA AS CLÁUSULAS EDITÁVEIS
+  clausulasNumeradas.forEach((clausula, index) => {
+    if (y > 250) { doc.addPage(); y = 20 }
+
+    // Número e título da cláusula
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
-    const tituloLines = doc.splitTextToSize(c.titulo, contentWidth)
-    doc.text(tituloLines, margin, y)
-    y += tituloLines.length * 5.5 + 2
+    doc.text(clausula.titulo, margin, y)
+    y += 6
+
+    // Texto da cláusula
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9.5)
-    y = addText(c.texto, y, 4)
-    y += 5
+    y = addText(clausula.texto, y, 4)
+    y += 6
   })
 
   y += 6
@@ -2137,7 +2205,7 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
   doc.text(rotulo.parte1, margin + 35, y, { align: 'center' })
   doc.text(rotulo.parte2, pageWidth / 2 + 45, y, { align: 'center' })
   doc.setTextColor(0)
-  y += 14
+  y += 12
 
   if (y > 255) { doc.addPage(); y = 20 }
   doc.text('Testemunhas:', margin, y); y += 8
@@ -2151,7 +2219,14 @@ async function generatePDFComClausulas(contract: Contract, clausulasEditadas: Cl
 
   doc.setFontSize(7)
   doc.setTextColor(150)
-  doc.text('Gerado por ImobApp · imobapp.com.br', pageWidth / 2, 290, { align: 'center' })
+  // Adiciona referência à lei específica conforme o tipo de contrato
+  let lawReference = 'Lei 8.245/1991' // Padrão para locação
+  if (contract.type === 'promessa_compra_venda' || contract.type === 'compra_venda') {
+    lawReference = 'Lei 13.786/2018 (Lei do Registro Imobiliário)'
+  } else if (contract.type === 'servicos') {
+    lawReference = 'Lei 13.709/2018 (LGPD) e Código Civil'
+  }
+  doc.text(`Gerado por ImobApp · imobapp.com.br · ${lawReference}`, pageWidth / 2, 290, { align: 'center' })
 
   doc.save(`contrato-personalizado-${(tenant?.name ?? 'contrato').toLowerCase().replace(/ /g, '-')}.pdf`)
 }
