@@ -332,17 +332,16 @@ export default function VistoriasPage() {
                         onChange={e => updateItem(item.id, 'observacao', e.target.value)}
                         placeholder="Observação (opcional)"
                         className="w-full text-sm border border-gray-200 rounded px-2 py-1 text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-400" />
-                      </div>
 
                       {/* Foto upload */}
                       <div className="mt-2">
                         <label className="text-xs font-medium text-gray-600 block mb-1">Fotos (máx. 5)</label>
                         <div className="flex flex-wrap gap-2">
-                          {item.fotos.map((url, index) => (
+                          {item.fotos.map((url: string, index: number) => (
                             <div key={index} className="relative w-16 h-16">
                               <img src={url} alt="vistoria" className="w-full h-full object-cover rounded border border-gray-200" />
                               <button onClick={() =>
-                                updateItem(item.id, 'fotos', item.fotos.filter((_, i) => i !== index))
+                                updateItem(item.id, 'fotos', item.fotos.filter((_: string, i: number) => i !== index))
                               } className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600">
                                 ×
                               </button>
