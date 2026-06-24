@@ -46,10 +46,10 @@ export default function InquilinosPage() {
         if (!form.name || !form.cpf) { alert('Nome e CPF são obrigatórios'); return }
         setSaving(true)
         if (editingId) {
-            await supabase.from('tenants').update(form).eq('id', editingId)
+            await supabase.from('people').update(form).eq('id', editingId)
         } else {
             const { data: { user } } = await supabase.auth.getUser()
-            await supabase.from('tenants').insert({ user_id: user!.id, ...form })
+            await supabase.from('people').insert({ user_id: user!.id, ...form })
         }
         setForm({ name: '', cpf: '', email: '', phone: '' })
         setEditingId(null)
@@ -67,7 +67,7 @@ export default function InquilinosPage() {
   
   async function handleDelete(id: string) {
     if (!confirm('Remover este inquilino?')) return
-    await supabase.from('tenants').delete().eq('id', id)
+    await supabase.from('people').delete().eq('id', id)
     loadTenants()
   }
 

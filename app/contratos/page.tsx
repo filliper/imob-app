@@ -383,11 +383,12 @@ export default function ContratosPage() {
   function renumerarClausulas(lista: Clausula[]): Clausula[] {
     return lista.map((c, idx) => {
       const numero = idx + 1
-      // Remove qualquer numeração antiga do início do título (ex: "1.", "3ª", "CLÁUSULA QUINTA —", "ITEM 04 —")
+      // Remove qualquer numeração antiga do início do título (ex: "1.", "3ª", "CLÁUSULA QUINTA —", "ITEM 04 —", "PRIMEIRA", etc.)
       const tituloLimpo = c.titulo
         .replace(/^(\d+ª?\s*[-—.]?\s*)/i, '')
         .replace(/^(cláusula\s+\w+\s*[-—]\s*)/i, '')
         .replace(/^(item\s+\d+\s*[-—]\s*)/i, '')
+        .replace(/^(primeira|segunda|terceira|quarta|quinta|sexta|sétima|oitava|nona|décima)\s*[-—]?\s*/i, '')
         .trim()
       return {
         ...c,
