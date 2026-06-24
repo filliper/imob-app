@@ -11,6 +11,7 @@ type Tenant = {
   cpf: string
   email: string
   phone: string
+  contracts_as_tenant?: { id: string; type: string; properties: { name: string } }[]
 }
 
 export default function InquilinosPage() {
@@ -29,7 +30,14 @@ export default function InquilinosPage() {
   async function loadTenants() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
-    const { data } = await supabase.from('tenants').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase
+      .from('people')
+      .select(`
+        *,
+        contracts_as_tenant:contracts!people_tenant_id(id, type, properties(name))
+      `)
+      .not('contracts_as_tenant', 'is', null)
+      .order('created_at', { ascending: false })
     setTenants(data ?? [])
     setLoading(false)
   }

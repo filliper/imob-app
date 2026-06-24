@@ -42,24 +42,39 @@ export default function Dashboard() {
       { count: contracts },
       { count: inspections },
       { count: leads },
-      { count: owners },
-      { count: tenants },
       { count: pgt_pendente },
       { count: pgt_atrasado },
       { data: pgt_pago_data },
       { data: receita_pendente_data },
+      { count: ownersResult },
+      { count: tenantsResult }
     ] = await Promise.all([
       supabase.from('properties').select('*', { count: 'exact', head: true }),
       supabase.from('contracts').select('*', { count: 'exact', head: true }),
       supabase.from('inspections').select('*', { count: 'exact', head: true }),
       supabase.from('leads').select('*', { count: 'exact', head: true }),
-      supabase.from('owners').select('*', { count: 'exact', head: true }),
-      supabase.from('tenants').select('*', { count: 'exact', head: true }),
       supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'pendente'),
       supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'atrasado'),
       supabase.from('payments').select('amount').eq('status', 'pago').gte('paid_date', primeiroDiaMes),
       supabase.from('payments').select('amount').eq('status', 'pendente'),
+      supabase.from('properties').select('people_owner_id', { count: 'exact', head: true }).not('people_owner_id', 'is', null),
+      supabase.from('contracts').select('people_tenant_id', { count: 'exact', head: true }).not('people_tenant_id', 'is', null),
     ])
+
+    // Get distinct counts for owners and tenants
+    const { data: ownersData } = await supabase
+      .from('properties')
+      .select('people_owner_id')
+      .not('people_owner_id', 'is', null)
+
+    const { data: tenantsData } = await supabase
+      .from('contracts')
+      .select('people_tenant_id')
+      .not('people_tenant_id', 'is', null)
+
+    // Count distinct owners and tenants
+    const distinctOwners = [...new Set((ownersData ?? []).map(o => o.people_owner_id))].length
+    const distinctTenants = [...new Set((tenantsData ?? []).map(t => t.people_tenant_id))].length
 
     const receita_mes = (pgt_pago_data ?? []).reduce((s: number, p: any) => s + p.amount, 0)
     const receita_pendente = (receita_pendente_data ?? []).reduce((s: number, p: any) => s + p.amount, 0)
@@ -69,8 +84,8 @@ export default function Dashboard() {
       contracts: contracts ?? 0,
       inspections: inspections ?? 0,
       leads: leads ?? 0,
-      owners: owners ?? 0,
-      tenants: tenants ?? 0,
+      owners: distinctOwners,
+      tenants: distinctTenants,
       payments_pendente: pgt_pendente ?? 0,
       payments_atrasado: pgt_atrasado ?? 0,
       payments_pago: (pgt_pago_data ?? []).length,

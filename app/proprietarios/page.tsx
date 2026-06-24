@@ -28,7 +28,14 @@ export default function ProprietariosPage() {
   async function loadOwners() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
-    const { data } = await supabase.from('owners').select('*, properties(id, name, rent_value)').order('created_at', { ascending: false })
+    const { data } = await supabase
+      .from('people')
+      .select(`
+        *,
+        properties:properties!people_owner_id(id, name, rent_value)
+      `)
+      .not('properties', 'is', null)
+      .order('created_at', { ascending: false })
     setOwners(data ?? [])
     setLoading(false)
   }
@@ -50,10 +57,10 @@ export default function ProprietariosPage() {
     if (!form.name || !form.phone) { alert('Nome e telefone são obrigatórios'); return }
     setSaving(true)
     if (editingId) {
-      await supabase.from('owners').update(form).eq('id', editingId)
+      await supabase.from('people').update(form).eq('id', editingId)
     } else {
       const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('owners').insert({ user_id: user!.id, ...form })
+      await supabase.from('people').insert({ user_id: user!.id, ...form })
     }
     cancelForm()
     loadOwners()
@@ -62,7 +69,7 @@ export default function ProprietariosPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Remover este proprietário?')) return
-    await supabase.from('owners').delete().eq('id', id)
+    await supabase.from('people').delete().eq('id', id)
     loadOwners()
   }
 
