@@ -360,7 +360,7 @@ Destaque automático da página ativa via `usePathname()`.
 
 1. **Typo no nome do imóvel:** "Apto 101- Cantro" (digitado errado no cadastro de teste). Corrigir manualmente no Supabase ou via interface de edição.
 
-2. **Migração incompleta de owners/tenants para people:** As tabelas `owners` e `tenants` ainda existem no banco. Os módulos `/proprietarios` e `/inquilinos` ainda funcionam mas não são mais exibidos no menu. A migração de dados foi feita via SQL mas as páginas de contratos e imóveis ainda podem usar as colunas legadas `owner_id` e `tenant_id` em algumas queries. **Verificar se todas as queries usam `people_owner_id` e `people_tenant_id`.**
+2. **Migração concluída:** Todas as páginas agora usam exclusivamente `people_owner_id` e `people_tenant_id`. As tabelas legadas `owners` e `tenants` ainda existem no banco de dados mas não são mais utilizadas pelo frontend. Recomenda-se removê-las em uma futura limpeza do banco.
 
 3. **Editor de cláusulas — renumeração parcial:** Alguns títulos de cláusulas vindos das funções legadas têm formato misto (ex: "CLÁUSULA SÉTIMA — DO PRAZO", "ITEM 04 —"). O regex de limpeza em `renumerarClausulas()` pode não capturar todos os formatos. Verificar e ajustar o regex se necessário.
 
@@ -393,8 +393,8 @@ Destaque automático da página ativa via `usePathname()`.
 ## 8. Próximos Passos Sugeridos
 
 ### Prioridade Alta
-- [ ] Finalizar migração: garantir que `/contratos` e `/imoveis` usam exclusivamente `people_owner_id` e `people_tenant_id`
-- [ ] Remover referências a `owners` e `tenants` das queries de contratos
+- [x] Finalizar migração: garantir que `/contratos` e `/imoveis` usam exclusivamente `people_owner_id` e `people_tenant_id`
+- [x] Remover referências a `owners` e `tenants` das queries de contratos
 - [ ] Unificar o gerador de PDF (editor de cláusulas deve usar o mesmo cabeçalho detalhado dos PDFs originais)
 - [ ] Corrigir regex de renumeração de cláusulas para todos os formatos
 
