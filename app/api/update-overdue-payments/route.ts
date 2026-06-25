@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
 
     // Send email notifications for each updated payment
     const emailPromises = updatedPayments.map(async (payment) => {
-      const propertyName = payment.contracts?.properties?.name || '';
+      const propertyName = payment.contracts?.[0]?.properties?.[0]?.name || '';
       const userEmail = userEmailMap[payment.user_id];
 
       if (!userEmail) {
