@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
         id,
         amount,
         due_date,
+        user_id,
         contracts!inner (
-          property_id,
           properties!inner (
             name
           )
@@ -41,46 +41,70 @@ export async function GET(request: NextRequest) {
       throw error;
     }
 
-    // Send email notifications for each updated payment
-    if (updatedPayments && updatedPayments.length > 0) {
-      const resend = require('resend');
-
-      const resendClient = resend(process.env.RESEND_API_KEY);
-
-      const emailPromises = updatedPayments.map(async (payment) => {
-        const propertyName = payment.contracts?.properties?.name || 'Imóvel não identificado';
-        const amount = Number(payment.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        const dueDate = new Date(payment.due_date).toLocaleDateString('pt-BR');
-
-        try {
-          await resendClient.emails.send({
-            from: process.env.FROM_EMAIL!,
-            to: ['destinatario@exemplo.com'], // TODO: Should be the user's email associated with the payment
-            subject: `Pagamento em atraso - ${propertyName}`,
-            html: `
-              <h2>Pagamento em atraso</h2>
-              <p>Prezado(a),</p>
-              <p>O pagamento referente ao imóvel <strong>${propertyName}</strong> está em atraso.</p>
-              <ul>
-                <li>Valor: ${amount}</li>
-                <li>Data de vencimento: ${dueDate}</li>
-              </ul>
-              <p>Por favor, regularize a situação o quanto antes.</p>
-              <p>Atenciosamente,<br/>ImobApp</p>
-            `,
-          });
-        } catch (emailError) {
-          console.error('Error sending email:', emailError);
-          // We don't throw here to avoid stopping other emails
-        }
-      });
-
-      await Promise.allSettled(emailPromises);
+    // If no payments were updated, return early
+    if (!updatedPayments || updatedPayments.length === 0) {
+      return new Response('No overdue payments found', { status: 200 });
     }
 
-    return new Response(`Successfully updated ${updatedPayments?.length ?? 0} overdue payments and sent notifications`, { status: 200 });
-  } catch (error: any) {
-    console.error('Error updating overdue payments:', error);
+    // Get unique user IDs from the updated payments
+    const userIds = [...new Set(updatedPayments.map(p => p.user_id))];
+
+    // Fetch user emails for these user IDs
+    const { data: users, error: userError } = await supabase
+      .from('auth.users')
+      .select('id, email')
+      .in('id', userIds);
+
+    if (userError) {
+      throw userError;
+    }
+
+    // Create a map of user ID to email
+    const userEmailMap: Record<string, string> = {};
+    users.forEach(user => {
+      if (user.email) {
+        userEmailMap[user.id] = user.email;
+      }
+    });
+
+    // Initialize Resend
+    const resend = require('resend');
+    const resendClient = resend(process.env.RESEND_API_KEY);
+
+    // Send email notifications for each updated payment
+    const emailPromises = updatedPayments.map(async (payment) => {
+      const propertyName = payment.contracts?.properties?.name || '';
+      const userEmail = userEmailMap[payment.user_id];
+
+      if (!userEmail) {
+        console.warn(`No email found for user ID: ${payment.user_id}`);
+        return; // Skip sending email if no email found
+      }
+
+      try {
+        await resendClient.emails.send({
+          from: 'ImobApp <onboarding@resend.dev>',
+          to: userEmail,
+          subject: `Pagamento em atraso: ${propertyName}`,
+          html: `
+            <p>Olá,</p>
+            <p>O pagamento no valor de R$ ${payment.amount.toFixed(2)} referente ao imóvel <strong>${propertyName}</strong> está em atraso.</p>
+            <p>Data de vencimento: ${new Date(payment.due_date).toLocaleDateString('pt-BR')}</p>
+            <p>Por favor, regularize a situação o quanto antes.</p>
+          `
+        });
+      } catch (emailError) {
+        console.error('Error sending email:', emailError);
+        // We don't throw here because we want to continue sending other emails
+      }
+    });
+
+    // Wait for all emails to be sent
+    await Promise.all(emailPromises);
+
+    return new Response(`Processed ${updatedPayments.length} overdue payments`, { status: 200 });
+  } catch (error) {
+    console.error('Error in update-overdue-payments:', error);
     return new Response('Internal Server Error', { status: 500 });
   }
 }
