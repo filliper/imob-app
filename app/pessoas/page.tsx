@@ -36,11 +36,28 @@ export default function PessoasPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'todos' | 'proprietarios' | 'inquilinos' | 'sem_papel'>('todos')
   const [form, setForm] = useState(EMPTY)
-
-  const supabase = createClient()
   const router = useRouter()
 
+  const supabase = createClient()
+
   useEffect(() => { loadPeople() }, [])
+
+  // Read filter from URL query parameters on initial load
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const paramFilter = searchParams.get('filter')
+    if (paramFilter && ['todos', 'proprietarios', 'inquilinos', 'sem_papel'].includes(paramFilter as any)) {
+      setFilter(paramFilter as 'todos' | 'proprietarios' | 'inquilinos' | 'sem_papel')
+    }
+  }, [])
+
+  // Update URL when filter changes (without triggering page reload)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    searchParams.set('filter', filter)
+    const newUrl = `${window.location.pathname}?${searchParams.toString()}`
+    window.history.replaceState({ path: newUrl }, '', newUrl)
+  }, [filter, router])
 
   async function loadPeople() {
     const { data: { user } } = await supabase.auth.getUser()

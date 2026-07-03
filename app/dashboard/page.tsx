@@ -169,8 +169,8 @@ export default function Dashboard() {
             <div className="grid grid-cols-4 gap-4 mb-8">
               {[
                 { label: 'Imóveis', value: stats?.properties, icon: '🏢', href: '/imoveis' },
-                { label: 'Proprietários', value: stats?.owners, icon: '👔', href: '/proprietarios' },
-                { label: 'Inquilinos', value: stats?.tenants, icon: '👤', href: '/inquilinos' },
+                { label: 'Proprietários', value: stats?.owners, icon: '👔', href: '/pessoas?filter=proprietarios' },
+                { label: 'Inquilinos', value: stats?.tenants, icon: '👤', href: '/pessoas?filter=inquilinos' },
                 { label: 'Contratos', value: stats?.contracts, icon: '📄', href: '/contratos' },
               ].map(s => (
                 <a key={s.label} href={s.href}
