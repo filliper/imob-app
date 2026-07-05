@@ -350,13 +350,13 @@ export default function ContratosPage() {
 
     if (contract.type === 'compra_venda') {
       return [
-        { id: 'c1', titulo: 'ITEM 03 — DESCRIÇÃO DO IMÓVEL', texto: `${property?.name}, situado na ${property?.address}.` },
-        { id: 'c2', titulo: 'ITEM 04 — DO PREÇO', texto: `Preço de ${valueFormatted}, pago integralmente à vista na assinatura.` },
-        { id: 'c3', titulo: 'ITEM 05 — DA POSSE', texto: 'Entrega após liberação do pagamento integral. Débitos anteriores são responsabilidade do VENDEDOR.' },
-        { id: 'c4', titulo: 'ITEM 06 — DA ESCRITURA', texto: 'Escritura lavrada em nome do(s) comprador(es).' },
-        { id: 'c5', titulo: 'ITEM 07 — DA DOCUMENTAÇÃO', texto: 'Entrega de matrícula, IPTU quitado, certidões pessoais e demais documentos na lavratura.' },
-        { id: 'c6', titulo: 'ITEM 08 — IRREVOGABILIDADE', texto: 'Negócio irrevogável e irretratável (arts. 417-420 CC).' },
-        { id: 'c7', titulo: 'ITEM 09 — DECLARAÇÕES FINAIS', texto: 'Despesas de transferência por conta do COMPRADOR. VENDEDOR responde por evicção de direito.' },
+        { id: 'c1', titulo: 'ITEM 01 — DO OBJETO', texto: `O objeto deste contrato é a venda e compra do imóvel situado na ${property?.address}, de propriedade do VENDEDOR, livre e desembaraçado de quaisquer ônus ou gravames.` },
+        { id: 'c2', titulo: 'ITEM 02 — DO PREÇO E PAGAMENTO', texto: `O preço total, acertado entre as partes, é de ${valueFormatted}, pago integralmente à vista na data da assinatura deste contrato, mediante transferência bancária ou outro meio acordado, dando ao VENDEDOR quitação plena, geral e irrevogável.` },
+        { id: 'c3', titulo: 'ITEM 03 — DA POSSE E ENTREGA', texto: `A posse do imóvel será transferida ao COMPRADOR após a quitação integral do preço, permanecendo o VENDEDOR responsável por tributos, taxas e encargos vencidos até aquela data.` },
+        { id: 'c4', titulo: 'ITEM 04 — DA ESCRITURA E REGISTRO', texto: `A escritura pública de compra e venda será lavrada em nome do COMPRADOR, perante o Cartório de Notas da comarca, e posteriormente registrada no Cartório de Registro de Imóveis da mesma comarca, estando o VENDEDOR obrigado a providenciar todos os documentos necessários para o registro.` },
+        { id: 'c5', titulo: 'ITEM 05 — DA DOCUMENTAÇÃO', texto: `O VENDEDOR entregará ao COMPRADOR, na ocasião da assinatura da escritura, a matrícula do imóvel atualizada, o cadastro de IPTU quitado até a data da posse, as contas de água, luz e gás quitadas, e as certidões necessárias para a transferência.` },
+        { id: 'c6', titulo: 'ITEM 06 — DA IRREVOGABILIDADE', texto: `O presente contrato é irrevogável e irretratável, nos termos dos artigos 417 a 420 do Código Civil, não admitindo arrependimento ou resolução unilateral por qualquer das partes.` },
+        { id: 'c7', titulo: 'ITEM 07 — DAS DESPESAS E GARANTIAS', texto: `As despesas com a escrituração, registro, impostos (ITBI, emolumentos, etc.) serão de exclusiva responsabilidade do COMPRADOR, enquanto o VENDEDOR responderá por eventuais evicções ou vícios de título relacionados ao imóvel.` },
       ]
     }
 

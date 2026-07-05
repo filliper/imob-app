@@ -3,6 +3,10 @@
     {
       "path": "/api/update-overdue-payments",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/update-leads-no-attendance",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

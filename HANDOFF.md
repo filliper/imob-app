@@ -39,7 +39,7 @@
 
 
 
-5. **Contrato de Compra e Venda:** modelo foi atualizado para "Compra e Venda de Bem Móvel" mas o sistema é imobiliário. **Verificado e corrigido: o modelo ahora usa o contrato padrão de Compra e Venda de Imóvel.*
+5. **Contrato de Compra e Venda:** modelo foi atualizado para "Compra e Venda de Bem Móvel" mas o sistema é imobiliário. **Verificado e corrigido: o modelo agora usa o contrato padrão de Compra e Venda de Imóvel.** (Concluído)
 
 
 
@@ -63,7 +63,7 @@
 
 
 
-5. **Notificações:** alertas de lead sem atendimento e pagamentos em atraso existem na UI mas não há envio de e-mail ou push notification.
+5. **Notificações:** alertas de lead sem atendimento e pagamentos em atraso possuem envio de e-mail via Resend e agendamento via Vercel Cron (diariamente para pagamentos, a cada 30 minutos para leads).
 
 
 
