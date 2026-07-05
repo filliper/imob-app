@@ -1,3 +1,12 @@
+### Prioridade Média
+- [x] Upload de fotos nas vistorias (Supabase Storage já configurado)
+- [ ] Landing page para divulgação do produto
+- [ ] Planos e cobrança (Stripe ou Pagar.me)
+- [x] Notificações por e-mail para pagamentos em atraso (Resend integrado) - Implementado com envio para e-mail do usuário e agendamento via Vercel Cron (diariamente às 3h UTC)
+- [x] Notificações por e-mail para leads sem atendimento - Implementado com envio para e-mail do usuário (corretor responsável ou agente) e agendamento via Vercel Cron (a cada 30 minutos)
+- [ ] Assinatura digital (integração D4Sign ou ClickSign)
+
+
 ### 7. Bugs Conhecidos / Pendências
 
 
@@ -6,15 +15,15 @@
 
 
 
-1. **Typo no nome do imóvel:** "Apto 101- Cantro" (digitado errado no cadastro de teste). Corrigir manualmente no Supabase ou via interface de edição.
+1. **Typo no nome do imóvel:** "Apto 101- Cantro" (digitado errado no cadastro de teste). **Corrigido manualmente no Supabase.*
 
 
 
-2. **Migração incompleta de owners/tenants para people:** As tabelas `owners` e `tenants` ainda existem no banco. Os módulos `/proprietarios` e `/inquilinos` ainda funcionam mas não são mais exibidos no menu. A migração de dados foi feita via SQL mas as páginas de contratos e imóveis ainda podem usar as colunas legadas `owner_id` e `tenant_id` em algumas queries. **Verificar se todas as queries usam `people_owner_id` e `people_tenant_id`.**
+2. **Migração incompleta de owners/tenants para people:** As tabelas `owners` e `tenants` ainda existem no banco. Os módulos `/proprietarios` e `/inquilinos` ainda funcionam mas não são mais exibidos no menu. A migração de dados foi feita via SQL mas as páginas de contratos e imóveis ainda podem usar as colunas legadas `owner_id` e `tenant_id` em algumas queries. **Verificado e corrigido: todas as queries agora usam `people_owner_id` e `people_tenant_id*.*
 
 
 
-3. **Editor de cláusulas — renumeração parcial:** Alguns títulos de cláusulas vindos das funções legadas têm formato misto (ex: "CLÁUSULA SÉTIMA — DO PRAZO", "ITEM 04 —"). O regex de limpeza em `renumerarClausulas()` pode não capturar todos os formatos. Verificar e ajustar o regex se necessário.
+3. **Editor de cláusulas — renumeração parcial:** Alguns títulos de cláusulas vindos das funções legadas têm formato misto (ex: "CLÁUSULA SÉTIMA — DO PRAZO", "ITEM 04 — "). O regex de limpeza em `renumerarClausulas()` foi ajustado para capturar todos os formatos, incluindo aqueles com acentos e variações de dash. **Corrigido.*
 
 
 
@@ -26,11 +35,11 @@
 
    - O PDF via editor tem cabeçalho/partes mais simples que os PDFs originais
 
-   - **Decisão pendente:** unificar os dois caminhos ou manter os dois
+   - **Decisão tomada: unificar os dois caminhos fazendo com que o editor use as funções específicas de tipo (como generatePDF, generateServicosPDF, etc.) passando a lista editada de cláusulas. Isso será implementado em uma futura atualização.*
 
 
 
-5. **Contrato de Compra e Venda:** modelo foi atualizado para "Compra e Venda de Bem Móvel" mas o sistema é imobiliário. Verificar se o modelo correto foi aplicado ou se precisa ajuste.
+5. **Contrato de Compra e Venda:** modelo foi atualizado para "Compra e Venda de Bem Móvel" mas o sistema é imobiliário. **Verificado e corrigido: o modelo ahora usa o contrato padrão de Compra e Venda de Imóvel.*
 
 
 
